@@ -1,61 +1,62 @@
 package performancemetrics
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/newrelic/infra-integrations-sdk/v3/integration"
 	"github.com/newrelic/infra-integrations-sdk/v3/log"
-	performancedbconnection "github.com/newrelic/nri-postgresql/src/connection"
-	commonparameters "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
+	connpkg "github.com/newrelic/nri-postgresql/src/connection"
+	commonparams "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
 	commonutils "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-utils"
 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/datamodels"
 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/queries"
+	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/selfmetrics"
 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/validations"
 )
 
-func PopulateWaitEventMetrics(conn *performancedbconnection.PGSQLConnection, pgIntegration *integration.Integration, cp *commonparameters.CommonParameters, enabledExtensions map[string]bool) error {
-	var isEligible bool
-	var eligibleCheckErr error
-	isEligible, eligibleCheckErr = validations.CheckWaitEventMetricsFetchEligibility(enabledExtensions)
-	if eligibleCheckErr != nil {
-		log.Error("Error executing query: %v", eligibleCheckErr)
-		return commonutils.ErrUnExpectedError
-	}
-	if !isEligible {
-		log.Debug("Extension 'pg_wait_sampling' or 'pg_stat_statement' is not enabled or unsupported version.")
-		return commonutils.ErrNotEligible
-	}
-	waitEventMetricsList, waitEventErr := getWaitEventMetrics(conn, cp)
-	if waitEventErr != nil {
-		log.Error("Error fetching wait event queries: %v", waitEventErr)
-		return commonutils.ErrUnExpectedError
-	}
-	if len(waitEventMetricsList) == 0 {
-		log.Debug("No wait event queries found.")
+func PopulateWaitEventMetrics(ctx context.Context, conn *connpkg.PGSQLConnection, pgInt *integration.Integration, cp *commonparams.CommonParameters, exts map[string]bool) error {
+	if ok, _ := validations.CheckWaitEventMetricsFetchEligibility(exts); !ok {
 		return nil
 	}
-	err := commonutils.IngestMetric(waitEventMetricsList, "PostgresWaitEvents", pgIntegration, cp)
+	if len(cp.Databases) == 0 {
+		return nil
+	}
+
+	// Increment self-metrics counter
+	selfmetrics.IncQueries()
+
+	iface, err := getWaitEventMetrics(ctx, conn, cp)
 	if err != nil {
-		log.Error("Error ingesting wait event queries: %v", err)
+		log.Error("wait-event fetch: %v", err)
 		return err
 	}
-	return nil
+	if len(iface) == 0 {
+		return nil
+	}
+
+	return commonutils.IngestMetric(iface, "PostgresWaitEvents", pgInt, cp)
 }
 
-func getWaitEventMetrics(conn *performancedbconnection.PGSQLConnection, cp *commonparameters.CommonParameters) ([]interface{}, error) {
-	var waitEventMetricsList []interface{}
-	var query = fmt.Sprintf(queries.WaitEvents, cp.Databases, cp.QueryMonitoringCountThreshold)
-	rows, err := conn.Queryx(query)
+func getWaitEventMetrics(ctx context.Context, conn *connpkg.PGSQLConnection, cp *commonparams.CommonParameters) ([]interface{}, error) {
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+
+	query := fmt.Sprintf(queries.WaitEvents, cp.Databases, cp.QueryMonitoringCountThreshold)
+	rows, err := conn.QueryxContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
+	var out []interface{}
 	for rows.Next() {
-		var waitEvent datamodels.WaitEventMetrics
-		if waitScanErr := rows.StructScan(&waitEvent); waitScanErr != nil {
+		var m datamodels.WaitEventMetrics
+		if err := rows.StructScan(&m); err != nil {
 			return nil, err
 		}
-		waitEventMetricsList = append(waitEventMetricsList, waitEvent)
+		out = append(out, m)
 	}
-	return waitEventMetricsList, nil
+	return out, nil
 }

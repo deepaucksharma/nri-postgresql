@@ -1,12 +1,15 @@
 package performancemetrics
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	commonparameters "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
 
 	"github.com/newrelic/infra-integrations-sdk/v3/integration"
 	commonutils "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-utils"
+	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/selfmetrics"
 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/validations"
 
 	"github.com/newrelic/infra-integrations-sdk/v3/log"
@@ -14,7 +17,7 @@ import (
 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/datamodels"
 )
 
-func PopulateBlockingMetrics(conn *performancedbconnection.PGSQLConnection, pgIntegration *integration.Integration, cp *commonparameters.CommonParameters, enabledExtensions map[string]bool) {
+func PopulateBlockingMetrics(ctx context.Context, conn *performancedbconnection.PGSQLConnection, pgIntegration *integration.Integration, cp *commonparameters.CommonParameters, enabledExtensions map[string]bool) {
 	isEligible, enableCheckError := validations.CheckBlockingSessionMetricsFetchEligibility(enabledExtensions, cp.Version)
 	if enableCheckError != nil {
 		log.Error("Error executing query: %v in PopulateBlockingMetrics", enableCheckError)
@@ -24,7 +27,7 @@ func PopulateBlockingMetrics(conn *performancedbconnection.PGSQLConnection, pgIn
 		log.Debug("Extension 'pg_stat_statements' is not enabled or unsupported version.")
 		return
 	}
-	blockingQueriesMetricsList, blockQueryFetchErr := getBlockingMetrics(conn, cp)
+	blockingQueriesMetricsList, blockQueryFetchErr := getBlockingMetrics(ctx, conn, cp)
 	if blockQueryFetchErr != nil {
 		log.Error("Error fetching Blocking queries: %v", blockQueryFetchErr)
 		return
@@ -38,9 +41,15 @@ func PopulateBlockingMetrics(conn *performancedbconnection.PGSQLConnection, pgIn
 		log.Error("Error ingesting Blocking queries: %v", err)
 		return
 	}
+	
+	// Increment self-metrics counter
+	selfmetrics.IncQueries()
 }
 
-func getBlockingMetrics(conn *performancedbconnection.PGSQLConnection, cp *commonparameters.CommonParameters) ([]interface{}, error) {
+func getBlockingMetrics(ctx context.Context, conn *performancedbconnection.PGSQLConnection, cp *commonparameters.CommonParameters) ([]interface{}, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	
 	var blockingQueriesMetricsList []interface{}
 	versionSpecificBlockingQuery, err := commonutils.FetchVersionSpecificBlockingQueries(cp.Version)
 	if err != nil {
@@ -48,7 +57,7 @@ func getBlockingMetrics(conn *performancedbconnection.PGSQLConnection, cp *commo
 		return nil, err
 	}
 	var query = fmt.Sprintf(versionSpecificBlockingQuery, cp.Databases, cp.QueryMonitoringCountThreshold)
-	rows, err := conn.Queryx(query)
+	rows, err := conn.QueryxContext(ctx, query)
 	if err != nil {
 		log.Error("Failed to execute query: %v", err)
 		return nil, commonutils.ErrUnExpectedError

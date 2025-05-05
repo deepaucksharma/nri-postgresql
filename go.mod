@@ -4,14 +4,15 @@ go 1.23.5
 
 require (
 	github.com/blang/semver/v4 v4.0.0
+	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/newrelic/infra-integrations-sdk/v3 v3.9.1
 	github.com/stretchr/testify v1.10.0
 	github.com/xeipuuv/gojsonschema v1.2.0
+	golang.org/x/time v0.11.0
 	gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0
 	gopkg.in/yaml.v3 v3.0.1
-	github.com/go-viper/mapstructure/v2 v2.2.1
 )
 
 require (

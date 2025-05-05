@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"reflect"
@@ -37,7 +38,8 @@ func PopulateMetrics(
 	}
 	defer con.Close()
 
-	version, err := CollectVersion(con)
+	// Pass background context as PopulateMetrics doesn't have a specific one
+	version, err := CollectVersion(context.Background(), con)
 	if err != nil {
 		log.Error("Metrics collection failed: error collecting version number: %s", err.Error())
 		return
@@ -223,9 +225,11 @@ type serverVersionRow struct {
 	Version string `db:"server_version"`
 }
 
-func CollectVersion(connection *connection.PGSQLConnection) (*semver.Version, error) {
+// CollectVersion collects the postgresql version using context
+func CollectVersion(ctx context.Context, connection *connection.PGSQLConnection) (*semver.Version, error) {
 	var versionRows []*serverVersionRow
-	if err := connection.Query(&versionRows, versionQuery); err != nil {
+	// Use QueryContext instead of Query
+	if err := connection.QueryContext(ctx, &versionRows, versionQuery); err != nil {
 		return nil, err
 	}
 

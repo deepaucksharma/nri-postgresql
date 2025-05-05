@@ -5,14 +5,11 @@ import (
 	"github.com/newrelic/nri-postgresql/src/args"
 )
 
-// The maximum number records that can be fetched in a single metrics
-const MaxQueryCountThreshold = 30
-
-// DefaultQueryMonitoringCountThreshold is the default threshold for the number of queries to monitor.
-const DefaultQueryMonitoringCountThreshold = 20
-
-// DefaultQueryResponseTimeThreshold is the default threshold for the response time of a query.
-const DefaultQueryResponseTimeThreshold = 500
+const (
+	MaxQueryCountThreshold               = 30
+	DefaultQueryMonitoringCountThreshold = 20
+	DefaultQueryResponseTimeThreshold    = 500
+)
 
 type CommonParameters struct {
 	Version                              uint64
@@ -23,33 +20,33 @@ type CommonParameters struct {
 	Port                                 string
 }
 
-func SetCommonParameters(args args.ArgumentList, version uint64, databases string) *CommonParameters {
+func SetCommonParameters(a args.ArgumentList, version uint64, dbs string) *CommonParameters {
 	return &CommonParameters{
 		Version:                              version,
-		Databases:                            databases, // comma separated database names
-		QueryMonitoringCountThreshold:        validateAndGetQueryMonitoringCountThreshold(args),
-		QueryMonitoringResponseTimeThreshold: validateAndGetQueryMonitoringResponseTimeThreshold(args),
-		Host:                                 args.Hostname,
-		Port:                                 args.Port,
+		Databases:                            dbs,
+		QueryMonitoringCountThreshold:        validateCount(a),
+		QueryMonitoringResponseTimeThreshold: validateResponseTime(a),
+		Host:                                 a.Hostname,
+		Port:                                 a.Port,
 	}
 }
 
-func validateAndGetQueryMonitoringResponseTimeThreshold(args args.ArgumentList) int {
-	if args.QueryMonitoringResponseTimeThreshold < 0 {
-		log.Warn("QueryResponseTimeThreshold should be greater than or equal to 0 but the input is %d, setting value to default which is %d", args.QueryMonitoringResponseTimeThreshold, DefaultQueryResponseTimeThreshold)
-		return DefaultQueryResponseTimeThreshold
-	}
-	return args.QueryMonitoringResponseTimeThreshold
-}
-
-func validateAndGetQueryMonitoringCountThreshold(args args.ArgumentList) int {
-	if args.QueryMonitoringCountThreshold < 0 {
-		log.Warn("QueryCountThreshold should be greater than 0 but the input is %d, setting value to default which is %d", args.QueryMonitoringCountThreshold, DefaultQueryMonitoringCountThreshold)
+func validateCount(a args.ArgumentList) int {
+	if a.QueryMonitoringCountThreshold < 0 {
+		log.Warn("invalid count %d, using default %d", a.QueryMonitoringCountThreshold, DefaultQueryMonitoringCountThreshold)
 		return DefaultQueryMonitoringCountThreshold
 	}
-	if args.QueryMonitoringCountThreshold > MaxQueryCountThreshold {
-		log.Warn("QueryCountThreshold should be less than or equal to max limit but the input is %d, setting value to max limit which is %d", args.QueryMonitoringCountThreshold, MaxQueryCountThreshold)
+	if a.QueryMonitoringCountThreshold > MaxQueryCountThreshold {
+		log.Warn("count %d exceeds max %d", a.QueryMonitoringCountThreshold, MaxQueryCountThreshold)
 		return MaxQueryCountThreshold
 	}
-	return args.QueryMonitoringCountThreshold
+	return a.QueryMonitoringCountThreshold
+}
+
+func validateResponseTime(a args.ArgumentList) int {
+	if a.QueryMonitoringResponseTimeThreshold < 0 {
+		log.Warn("invalid response time %d, using default %d", a.QueryMonitoringResponseTimeThreshold, DefaultQueryResponseTimeThreshold)
+		return DefaultQueryResponseTimeThreshold
+	}
+	return a.QueryMonitoringResponseTimeThreshold
 }

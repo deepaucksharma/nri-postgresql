@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"testing"
 
 	"github.com/blang/semver/v4"
@@ -22,7 +23,7 @@ func Test_collectVersion(t *testing.T) {
 		Minor: 3,
 	}
 
-	version, err := CollectVersion(testConnection)
+	version, err := CollectVersion(context.Background(), testConnection)
 
 	assert.Nil(t, err)
 	assert.Equal(t, expected, version)
@@ -42,7 +43,7 @@ func Test_collectVersion_EnterpriseDB(t *testing.T) {
 		Patch: 7,
 	}
 
-	version, err := CollectVersion(testConnection)
+	version, err := CollectVersion(context.Background(), testConnection)
 
 	assert.Nil(t, err)
 	assert.Equal(t, expected, version)
@@ -61,7 +62,7 @@ func Test_collectVersion_Ubuntu(t *testing.T) {
 		Minor: 4,
 	}
 
-	version, err := CollectVersion(testConnection)
+	version, err := CollectVersion(context.Background(), testConnection)
 
 	assert.Nil(t, err)
 	assert.Equal(t, expected, version)
@@ -80,7 +81,7 @@ func Test_collectVersion_Debian(t *testing.T) {
 		Minor: 4,
 	}
 
-	version, err := CollectVersion(testConnection)
+	version, err := CollectVersion(context.Background(), testConnection)
 
 	assert.Nil(t, err)
 	assert.Equal(t, expected, version)
@@ -94,7 +95,7 @@ func Test_collectVersion_Err(t *testing.T) {
 
 	mock.ExpectQuery(versionQuery).WillReturnRows(versionRows)
 
-	_, err := CollectVersion(testConnection)
+	_, err := CollectVersion(context.Background(), testConnection)
 
 	assert.NotNil(t, err)
 }

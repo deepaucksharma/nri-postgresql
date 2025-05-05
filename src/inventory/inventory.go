@@ -1,9 +1,13 @@
 package inventory
 
 import (
+	"context"
+	"time"
+	
 	"github.com/newrelic/infra-integrations-sdk/v3/integration"
 	"github.com/newrelic/infra-integrations-sdk/v3/log"
 	"github.com/newrelic/nri-postgresql/src/connection"
+	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/selfmetrics"
 )
 
 const (
@@ -18,9 +22,14 @@ type configQueryRow struct {
 }
 
 // PopulateInventory collects all the configuration and populates the instance entity
-func PopulateInventory(entity *integration.Entity, connection *connection.PGSQLConnection) {
+func PopulateInventory(ctx context.Context, entity *integration.Entity, connection *connection.PGSQLConnection) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	
+	selfmetrics.IncQueries()
+	
 	configRows := make([]*configQueryRow, 0)
-	if err := connection.Query(&configRows, configQuery); err != nil {
+	if err := connection.QueryContext(ctx, &configRows, configQuery); err != nil {
 		log.Error("Failed to execute config query: %v", err)
 	}
 

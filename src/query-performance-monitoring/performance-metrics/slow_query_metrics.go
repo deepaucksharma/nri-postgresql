@@ -1,67 +1,68 @@
 package performancemetrics
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/newrelic/infra-integrations-sdk/v3/integration"
 	"github.com/newrelic/infra-integrations-sdk/v3/log"
-	performancedbconnection "github.com/newrelic/nri-postgresql/src/connection"
-	commonparameters "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
+	connpkg "github.com/newrelic/nri-postgresql/src/connection"
+	commonparams "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
 	commonutils "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-utils"
 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/datamodels"
 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/validations"
 )
 
-func getSlowRunningMetrics(conn *performancedbconnection.PGSQLConnection, cp *commonparameters.CommonParameters) ([]datamodels.SlowRunningQueryMetrics, []interface{}, error) {
-	var slowQueryMetricsList []datamodels.SlowRunningQueryMetrics
-	var slowQueryMetricsListInterface []interface{}
-	versionSpecificSlowQuery, err := commonutils.FetchVersionSpecificSlowQueries(cp.Version)
+func PopulateSlowRunningMetrics(conn *connpkg.PGSQLConnection, pgInt *integration.Integration, cp *commonparams.CommonParameters, exts map[string]bool) []datamodels.SlowRunningQueryMetrics {
+	if ok, _ := validations.CheckSlowQueryMetricsFetchEligibility(exts); !ok {
+		return nil
+	}
+	if len(cp.Databases) == 0 {
+		return nil
+	}
+
+	list, iface, err := getSlowRunningMetrics(conn, cp)
 	if err != nil {
-		log.Error("Unsupported postgres version: %v", err)
+		log.Error("slow query fetch: %v", err)
+		return nil
+	}
+	if len(list) == 0 {
+		return nil
+	}
+
+	if err := commonutils.IngestMetric(iface, "PostgresSlowQueries", pgInt, cp); err != nil {
+		log.Error("ingest slow queries: %v", err)
+	}
+	return list
+}
+
+func getSlowRunningMetrics(conn *connpkg.PGSQLConnection, cp *commonparams.CommonParameters) ([]datamodels.SlowRunningQueryMetrics, []interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tpl, err := commonutils.FetchVersionSpecificSlowQueries(cp.Version)
+	if err != nil {
 		return nil, nil, err
 	}
-	var query = fmt.Sprintf(versionSpecificSlowQuery, cp.Databases, cp.QueryMonitoringCountThreshold)
-	rows, err := conn.Queryx(query)
+
+	query := fmt.Sprintf(tpl, cp.Databases, cp.QueryMonitoringCountThreshold)
+	rows, err := conn.QueryxContext(ctx, query)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer rows.Close()
+
+	var list []datamodels.SlowRunningQueryMetrics
+	var iface []interface{}
+
 	for rows.Next() {
-		var slowQuery datamodels.SlowRunningQueryMetrics
-		if scanErr := rows.StructScan(&slowQuery); scanErr != nil {
+		var m datamodels.SlowRunningQueryMetrics
+		if err := rows.StructScan(&m); err != nil {
 			return nil, nil, err
 		}
-		slowQueryMetricsList = append(slowQueryMetricsList, slowQuery)
-		slowQueryMetricsListInterface = append(slowQueryMetricsListInterface, slowQuery)
+		list = append(list, m)
+		iface = append(iface, m)
 	}
-	return slowQueryMetricsList, slowQueryMetricsListInterface, nil
-}
-
-func PopulateSlowRunningMetrics(conn *performancedbconnection.PGSQLConnection, pgIntegration *integration.Integration, cp *commonparameters.CommonParameters, enabledExtensions map[string]bool) []datamodels.SlowRunningQueryMetrics {
-	isEligible, err := validations.CheckSlowQueryMetricsFetchEligibility(enabledExtensions)
-	if err != nil {
-		log.Error("Error executing query: %v", err)
-		return nil
-	}
-	if !isEligible {
-		log.Debug("Extension 'pg_stat_statements' is not enabled or unsupported version.")
-		return nil
-	}
-
-	slowQueryMetricsList, slowQueryMetricsListInterface, err := getSlowRunningMetrics(conn, cp)
-	if err != nil {
-		log.Error("Error fetching slow-running queries: %v", err)
-		return nil
-	}
-
-	if len(slowQueryMetricsList) == 0 {
-		log.Debug("No slow-running queries found.")
-		return nil
-	}
-	err = commonutils.IngestMetric(slowQueryMetricsListInterface, "PostgresSlowQueries", pgIntegration, cp)
-	if err != nil {
-		log.Error("Error ingesting slow-running queries: %v", err)
-		return nil
-	}
-	return slowQueryMetricsList
+	return list, iface, nil
 }

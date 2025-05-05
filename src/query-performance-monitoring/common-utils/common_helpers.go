@@ -2,41 +2,44 @@ package commonutils
 
 import (
 	"crypto/rand"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/newrelic/nri-postgresql/src/collection"
 )
 
-// re is a regular expression that matches single-quoted strings, numbers, or double-quoted strings
 var re = regexp.MustCompile(`'[^']*'|\d+|".*?"`)
 
 func GetDatabaseListInString(dbMap collection.DatabaseList) string {
 	if len(dbMap) == 0 {
 		return ""
 	}
-	var quotedNames = make([]string, 0)
-	for dbName := range dbMap {
-		quotedNames = append(quotedNames, fmt.Sprintf("'%s'", dbName))
+	var quoted []string
+	for n := range dbMap {
+		quoted = append(quoted, fmt.Sprintf("'%s'", n))
 	}
-	return strings.Join(quotedNames, ",")
+	return strings.Join(quoted, ",")
 }
 
-func AnonymizeQueryText(query string) string {
-	anonymizedQuery := re.ReplaceAllString(query, "?")
-	return anonymizedQuery
+func AnonymizeQueryText(q string) string {
+	return re.ReplaceAllString(q, "?")
 }
 
-// This function is used to generate a unique plan ID for a query
+var planCounter uint64
+
 func GeneratePlanID() (string, error) {
-	randomInt, err := rand.Int(rand.Reader, big.NewInt(RandomIntRange))
+	ctr := atomic.AddUint64(&planCounter, 1)
+	rnd, err := rand.Int(rand.Reader, big.NewInt(RandomIntRange))
 	if err != nil {
 		return "", ErrUnExpectedError
 	}
-	currentTime := time.Now().Format(TimeFormat)
-	result := fmt.Sprintf("%d-%s", randomInt.Int64(), currentTime)
-	return result, nil
+	ts := time.Now().UTC().Format(TimeFormat)
+	hash := sha1.Sum([]byte(ts))
+	return fmt.Sprintf("%06d-%06d-%s", rnd.Int64(), ctr%1_000_000, hex.EncodeToString(hash[:6])), nil
 }

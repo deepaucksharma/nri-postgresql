@@ -1,7 +1,9 @@
 package performancemetrics
 
 import (
+	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/newrelic/infra-integrations-sdk/v3/integration"
@@ -10,14 +12,19 @@ import (
 	commonparameters "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
 	commonutils "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-utils"
 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/datamodels"
+	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/selfmetrics"
 )
 
-func PopulateExecutionPlanMetrics(results []datamodels.IndividualQueryMetrics, pgIntegration *integration.Integration, cp *commonparameters.CommonParameters, connectionInfo performancedbconnection.Info) {
+func PopulateExecutionPlanMetrics(ctx context.Context, results []datamodels.IndividualQueryMetrics, pgIntegration *integration.Integration, cp *commonparameters.CommonParameters, connectionInfo performancedbconnection.Info) {
 	if len(results) == 0 {
 		log.Debug("No individual queries found.")
 		return
 	}
-	executionDetailsList := getExecutionPlanMetrics(results, connectionInfo)
+	
+	// Increment self-metrics counter
+	selfmetrics.IncQueries()
+	
+	executionDetailsList := getExecutionPlanMetrics(ctx, results, connectionInfo)
 	err := commonutils.IngestMetric(executionDetailsList, "PostgresExecutionPlanMetrics", pgIntegration, cp)
 	if err != nil {
 		log.Error("Error ingesting Execution Plan metrics: %v", err)
@@ -25,7 +32,7 @@ func PopulateExecutionPlanMetrics(results []datamodels.IndividualQueryMetrics, p
 	}
 }
 
-func getExecutionPlanMetrics(results []datamodels.IndividualQueryMetrics, connectionInfo performancedbconnection.Info) []interface{} {
+func getExecutionPlanMetrics(ctx context.Context, results []datamodels.IndividualQueryMetrics, connectionInfo performancedbconnection.Info) []interface{} {
 	var executionPlanMetricsList []interface{}
 	var groupIndividualQueriesByDatabase = groupQueriesByDatabase(results)
 	for dbName, individualQueriesList := range groupIndividualQueriesByDatabase {
@@ -34,21 +41,26 @@ func getExecutionPlanMetrics(results []datamodels.IndividualQueryMetrics, connec
 			log.Error("Error opening database connection: %v", err)
 			continue
 		}
-		processExecutionPlanOfQueries(individualQueriesList, dbConn, &executionPlanMetricsList)
+		processExecutionPlanOfQueries(ctx, individualQueriesList, dbConn, &executionPlanMetricsList)
 		dbConn.Close()
 	}
 
 	return executionPlanMetricsList
 }
 
-func processExecutionPlanOfQueries(individualQueriesList []datamodels.IndividualQueryMetrics, dbConn *performancedbconnection.PGSQLConnection, executionPlanMetricsList *[]interface{}) {
+func processExecutionPlanOfQueries(ctx context.Context, individualQueriesList []datamodels.IndividualQueryMetrics, dbConn *performancedbconnection.PGSQLConnection, executionPlanMetricsList *[]interface{}) {
 	for _, individualQuery := range individualQueriesList {
 		if individualQuery.RealQueryText == nil || individualQuery.QueryID == nil || individualQuery.DatabaseName == nil {
 			log.Error("QueryText, QueryID or Database Name is nil")
 			continue
 		}
+		
+		// Create a timeout context for each query
+		queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		
 		query := "EXPLAIN (FORMAT JSON) " + *individualQuery.RealQueryText
-		rows, err := dbConn.Queryx(query)
+		rows, err := dbConn.QueryxContext(queryCtx, query)
 		if err != nil {
 			log.Debug("Error executing query: %v", err)
 			continue

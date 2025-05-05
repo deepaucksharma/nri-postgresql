@@ -1,0 +1,1090 @@
+diff --git a/changes.txt b/changes.txt
+index 386a742..e69de29 100644
+--- a/changes.txt
++++ b/changes.txt
+@@ -1,1085 +0,0 @@
+-diff --git a/changes.txt b/changes.txt
+-index ee1cf5a..e69de29 100644
+---- a/changes.txt
+-+++ b/changes.txt
+-@@ -1,1080 +0,0 @@
+--diff --git a/changes.txt b/changes.txt
+--index b803877..e69de29 100644
+----- a/changes.txt
+--+++ b/changes.txt
+--@@ -1,1075 +0,0 @@
+---diff --git a/changes.txt b/changes.txt
+---index 17cc7f1..e69de29 100644
+------ a/changes.txt
+---+++ b/changes.txt
+---@@ -1,1070 +0,0 @@
+----diff --git a/changes.txt b/changes.txt
+----index 44f9748..e69de29 100644
+------- a/changes.txt
+----+++ b/changes.txt
+----@@ -1,1065 +0,0 @@
+-----diff --git a/changes.txt b/changes.txt
+-----index 4c15ab7..e69de29 100644
+-------- a/changes.txt
+-----+++ b/changes.txt
+-----@@ -1,1060 +0,0 @@
+------diff --git a/changes.txt b/changes.txt
+------index 9f71634..e69de29 100644
+--------- a/changes.txt
+------+++ b/changes.txt
+------@@ -1,1055 +0,0 @@
+-------diff --git a/go.mod b/go.mod
+-------index e9b00c4..378ccc5 100644
+---------- a/go.mod
+-------+++ b/go.mod
+-------@@ -4,6 +4,7 @@ go 1.23.5
+------- 
+------- require (
+------- 	github.com/blang/semver/v4 v4.0.0
+-------+	github.com/go-viper/mapstructure/v2 v2.2.1
+------- 	github.com/jmoiron/sqlx v1.4.0
+------- 	github.com/lib/pq v1.10.9
+------- 	github.com/newrelic/infra-integrations-sdk/v3 v3.9.1
+-------@@ -11,7 +12,6 @@ require (
+------- 	github.com/xeipuuv/gojsonschema v1.2.0
+------- 	gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0
+------- 	gopkg.in/yaml.v3 v3.0.1
+--------	github.com/go-viper/mapstructure/v2 v2.2.1
+------- )
+------- 
+------- require (
+-------@@ -22,5 +22,6 @@ require (
+------- 	github.com/stretchr/objx v0.5.2 // indirect
+------- 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
+------- 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
+-------+	golang.org/x/time v0.11.0 // indirect
+------- 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
+------- )
+-------diff --git a/go.sum b/go.sum
+-------index b348666..5f2c640 100644
+---------- a/go.sum
+-------+++ b/go.sum
+-------@@ -40,6 +40,8 @@ github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 h1:EzJWgHo
+------- github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415/go.mod h1:GwrjFmJcFw6At/Gs6z4yjiIwzuJ1/+UwLxMQDVQXShQ=
+------- github.com/xeipuuv/gojsonschema v1.2.0 h1:LhYJRs+L4fBtjZUfuSZIKGeVu0QRy8e5Xi7D17UxZ74=
+------- github.com/xeipuuv/gojsonschema v1.2.0/go.mod h1:anYRn/JVcOK2ZgGU+IjEV4nwlhoK5sQluxsYJ78Id3Y=
+-------+golang.org/x/time v0.11.0 h1:/bpjEDfN9tkoN/ryeYHnv5hcMlc8ncjMcM4XBk5NWV0=
+-------+golang.org/x/time v0.11.0/go.mod h1:CDIdPxbZBQxdj6cxyCIdrNogrJKMJ7pr37NYpMcMDSg=
+------- gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0 h1:FVCohIoYO7IJoDDVpV2pdq7SgrMH6wHnuTyrdrxJNoY=
+------- gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0/go.mod h1:OdE7CF6DbADk7lN8LIKRzRJTTZXIjtWgA5THM5lhBAw=
+------- gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+-------diff --git a/src/connection/pgsql_connection.go b/src/connection/pgsql_connection.go
+-------index fd762f2..bcc1727 100644
+---------- a/src/connection/pgsql_connection.go
+-------+++ b/src/connection/pgsql_connection.go
+-------@@ -2,6 +2,7 @@
+------- package connection
+------- 
+------- import (
+-------+	"context"
+------- 	"fmt"
+------- 	"net/url"
+------- 
+-------@@ -102,6 +103,16 @@ func (p PGSQLConnection) Queryx(query string) (*sqlx.Rows, error) {
+------- 	return p.connection.Queryx(query)
+------- }
+------- 
+-------+// QueryContext runs a query with context and loads results into v
+-------+func (p PGSQLConnection) QueryContext(ctx context.Context, v interface{}, query string) error {
+-------+	return p.connection.SelectContext(ctx, v, query)
+-------+}
+-------+
+-------+// QueryxContext runs a query with context and returns a set of rows
+-------+func (p PGSQLConnection) QueryxContext(ctx context.Context, query string) (*sqlx.Rows, error) {
+-------+	return p.connection.QueryxContext(ctx, query)
+-------+}
+-------+
+------- type extensions map[string]map[string]bool
+------- 
+------- type extensionRow struct {
+-------diff --git a/src/metrics/metrics.go b/src/metrics/metrics.go
+-------index 0a3cbdd..81df270 100644
+---------- a/src/metrics/metrics.go
+-------+++ b/src/metrics/metrics.go
+-------@@ -1,6 +1,7 @@
+------- package metrics
+------- 
+------- import (
+-------+	"context"
+------- 	"fmt"
+------- 	"io/ioutil"
+------- 	"reflect"
+-------@@ -37,7 +38,8 @@ func PopulateMetrics(
+------- 	}
+------- 	defer con.Close()
+------- 
+--------	version, err := CollectVersion(con)
+-------+	// Pass background context as PopulateMetrics doesn't have a specific one
+-------+	version, err := CollectVersion(context.Background(), con)
+------- 	if err != nil {
+------- 		log.Error("Metrics collection failed: error collecting version number: %s", err.Error())
+------- 		return
+-------@@ -223,9 +225,11 @@ type serverVersionRow struct {
+------- 	Version string `db:"server_version"`
+------- }
+------- 
+--------func CollectVersion(connection *connection.PGSQLConnection) (*semver.Version, error) {
+-------+// CollectVersion collects the postgresql version using context
+-------+func CollectVersion(ctx context.Context, connection *connection.PGSQLConnection) (*semver.Version, error) {
+------- 	var versionRows []*serverVersionRow
+--------	if err := connection.Query(&versionRows, versionQuery); err != nil {
+-------+	// Use QueryContext instead of Query
+-------+	if err := connection.QueryContext(ctx, &versionRows, versionQuery); err != nil {
+------- 		return nil, err
+------- 	}
+------- 
+-------diff --git a/src/metrics/version_test.go b/src/metrics/version_test.go
+-------index d696396..a04474f 100644
+---------- a/src/metrics/version_test.go
+-------+++ b/src/metrics/version_test.go
+-------@@ -1,6 +1,7 @@
+------- package metrics
+------- 
+------- import (
+-------+	"context"
+------- 	"testing"
+------- 
+------- 	"github.com/blang/semver/v4"
+-------@@ -22,7 +23,7 @@ func Test_collectVersion(t *testing.T) {
+------- 		Minor: 3,
+------- 	}
+------- 
+--------	version, err := CollectVersion(testConnection)
+-------+	version, err := CollectVersion(context.Background(), testConnection)
+------- 
+------- 	assert.Nil(t, err)
+------- 	assert.Equal(t, expected, version)
+-------@@ -42,7 +43,7 @@ func Test_collectVersion_EnterpriseDB(t *testing.T) {
+------- 		Patch: 7,
+------- 	}
+------- 
+--------	version, err := CollectVersion(testConnection)
+-------+	version, err := CollectVersion(context.Background(), testConnection)
+------- 
+------- 	assert.Nil(t, err)
+------- 	assert.Equal(t, expected, version)
+-------@@ -61,7 +62,7 @@ func Test_collectVersion_Ubuntu(t *testing.T) {
+------- 		Minor: 4,
+------- 	}
+------- 
+--------	version, err := CollectVersion(testConnection)
+-------+	version, err := CollectVersion(context.Background(), testConnection)
+------- 
+------- 	assert.Nil(t, err)
+------- 	assert.Equal(t, expected, version)
+-------@@ -80,7 +81,7 @@ func Test_collectVersion_Debian(t *testing.T) {
+------- 		Minor: 4,
+------- 	}
+------- 
+--------	version, err := CollectVersion(testConnection)
+-------+	version, err := CollectVersion(context.Background(), testConnection)
+------- 
+------- 	assert.Nil(t, err)
+------- 	assert.Equal(t, expected, version)
+-------@@ -94,7 +95,7 @@ func Test_collectVersion_Err(t *testing.T) {
+------- 
+------- 	mock.ExpectQuery(versionQuery).WillReturnRows(versionRows)
+------- 
+--------	_, err := CollectVersion(testConnection)
+-------+	_, err := CollectVersion(context.Background(), testConnection)
+------- 
+------- 	assert.NotNil(t, err)
+------- }
+-------diff --git a/src/query-performance-monitoring/common-parameters/common_parameters.go b/src/query-performance-monitoring/common-parameters/common_parameters.go
+-------index c4d00da..4f6f443 100644
+---------- a/src/query-performance-monitoring/common-parameters/common_parameters.go
+-------+++ b/src/query-performance-monitoring/common-parameters/common_parameters.go
+-------@@ -5,14 +5,11 @@ import (
+------- 	"github.com/newrelic/nri-postgresql/src/args"
+------- )
+------- 
+--------// The maximum number records that can be fetched in a single metrics
+--------const MaxQueryCountThreshold = 30
+--------
+--------// DefaultQueryMonitoringCountThreshold is the default threshold for the number of queries to monitor.
+--------const DefaultQueryMonitoringCountThreshold = 20
+--------
+--------// DefaultQueryResponseTimeThreshold is the default threshold for the response time of a query.
+--------const DefaultQueryResponseTimeThreshold = 500
+-------+const (
+-------+	MaxQueryCountThreshold               = 30
+-------+	DefaultQueryMonitoringCountThreshold = 20
+-------+	DefaultQueryResponseTimeThreshold    = 500
+-------+)
+------- 
+------- type CommonParameters struct {
+------- 	Version                              uint64
+-------@@ -23,33 +20,33 @@ type CommonParameters struct {
+------- 	Port                                 string
+------- }
+------- 
+--------func SetCommonParameters(args args.ArgumentList, version uint64, databases string) *CommonParameters {
+-------+func SetCommonParameters(a args.ArgumentList, version uint64, dbs string) *CommonParameters {
+------- 	return &CommonParameters{
+------- 		Version:                              version,
+--------		Databases:                            databases, // comma separated database names
+--------		QueryMonitoringCountThreshold:        validateAndGetQueryMonitoringCountThreshold(args),
+--------		QueryMonitoringResponseTimeThreshold: validateAndGetQueryMonitoringResponseTimeThreshold(args),
+--------		Host:                                 args.Hostname,
+--------		Port:                                 args.Port,
+-------+		Databases:                            dbs,
+-------+		QueryMonitoringCountThreshold:        validateCount(a),
+-------+		QueryMonitoringResponseTimeThreshold: validateResponseTime(a),
+-------+		Host:                                 a.Hostname,
+-------+		Port:                                 a.Port,
+------- 	}
+------- }
+------- 
+--------func validateAndGetQueryMonitoringResponseTimeThreshold(args args.ArgumentList) int {
+--------	if args.QueryMonitoringResponseTimeThreshold < 0 {
+--------		log.Warn("QueryResponseTimeThreshold should be greater than or equal to 0 but the input is %d, setting value to default which is %d", args.QueryMonitoringResponseTimeThreshold, DefaultQueryResponseTimeThreshold)
+--------		return DefaultQueryResponseTimeThreshold
+--------	}
+--------	return args.QueryMonitoringResponseTimeThreshold
+--------}
+--------
+--------func validateAndGetQueryMonitoringCountThreshold(args args.ArgumentList) int {
+--------	if args.QueryMonitoringCountThreshold < 0 {
+--------		log.Warn("QueryCountThreshold should be greater than 0 but the input is %d, setting value to default which is %d", args.QueryMonitoringCountThreshold, DefaultQueryMonitoringCountThreshold)
+-------+func validateCount(a args.ArgumentList) int {
+-------+	if a.QueryMonitoringCountThreshold < 0 {
+-------+		log.Warn("invalid count %d, using default %d", a.QueryMonitoringCountThreshold, DefaultQueryMonitoringCountThreshold)
+------- 		return DefaultQueryMonitoringCountThreshold
+------- 	}
+--------	if args.QueryMonitoringCountThreshold > MaxQueryCountThreshold {
+--------		log.Warn("QueryCountThreshold should be less than or equal to max limit but the input is %d, setting value to max limit which is %d", args.QueryMonitoringCountThreshold, MaxQueryCountThreshold)
+-------+	if a.QueryMonitoringCountThreshold > MaxQueryCountThreshold {
+-------+		log.Warn("count %d exceeds max %d", a.QueryMonitoringCountThreshold, MaxQueryCountThreshold)
+------- 		return MaxQueryCountThreshold
+------- 	}
+--------	return args.QueryMonitoringCountThreshold
+-------+	return a.QueryMonitoringCountThreshold
+-------+}
+-------+
+-------+func validateResponseTime(a args.ArgumentList) int {
+-------+	if a.QueryMonitoringResponseTimeThreshold < 0 {
+-------+		log.Warn("invalid response time %d, using default %d", a.QueryMonitoringResponseTimeThreshold, DefaultQueryResponseTimeThreshold)
+-------+		return DefaultQueryResponseTimeThreshold
+-------+	}
+-------+	return a.QueryMonitoringResponseTimeThreshold
+------- }
+-------diff --git a/src/query-performance-monitoring/common-utils/common_helpers.go b/src/query-performance-monitoring/common-utils/common_helpers.go
+-------index 1fa690c..376a6c7 100644
+---------- a/src/query-performance-monitoring/common-utils/common_helpers.go
+-------+++ b/src/query-performance-monitoring/common-utils/common_helpers.go
+-------@@ -2,41 +2,44 @@ package commonutils
+------- 
+------- import (
+------- 	"crypto/rand"
+-------+	"crypto/sha1"
+-------+	"encoding/hex"
+------- 	"fmt"
+------- 	"math/big"
+------- 	"regexp"
+------- 	"strings"
+-------+	"sync/atomic"
+------- 	"time"
+------- 
+------- 	"github.com/newrelic/nri-postgresql/src/collection"
+------- )
+------- 
+--------// re is a regular expression that matches single-quoted strings, numbers, or double-quoted strings
+------- var re = regexp.MustCompile(`'[^']*'|\d+|".*?"`)
+------- 
+------- func GetDatabaseListInString(dbMap collection.DatabaseList) string {
+------- 	if len(dbMap) == 0 {
+------- 		return ""
+------- 	}
+--------	var quotedNames = make([]string, 0)
+--------	for dbName := range dbMap {
+--------		quotedNames = append(quotedNames, fmt.Sprintf("'%s'", dbName))
+-------+	var quoted []string
+-------+	for n := range dbMap {
+-------+		quoted = append(quoted, fmt.Sprintf("'%s'", n))
+------- 	}
+--------	return strings.Join(quotedNames, ",")
+-------+	return strings.Join(quoted, ",")
+------- }
+------- 
+--------func AnonymizeQueryText(query string) string {
+--------	anonymizedQuery := re.ReplaceAllString(query, "?")
+--------	return anonymizedQuery
+-------+func AnonymizeQueryText(q string) string {
+-------+	return re.ReplaceAllString(q, "?")
+------- }
+------- 
+--------// This function is used to generate a unique plan ID for a query
+-------+var planCounter uint64
+-------+
+------- func GeneratePlanID() (string, error) {
+--------	randomInt, err := rand.Int(rand.Reader, big.NewInt(RandomIntRange))
+-------+	ctr := atomic.AddUint64(&planCounter, 1)
+-------+	rnd, err := rand.Int(rand.Reader, big.NewInt(RandomIntRange))
+------- 	if err != nil {
+------- 		return "", ErrUnExpectedError
+------- 	}
+--------	currentTime := time.Now().Format(TimeFormat)
+--------	result := fmt.Sprintf("%d-%s", randomInt.Int64(), currentTime)
+--------	return result, nil
+-------+	ts := time.Now().UTC().Format(TimeFormat)
+-------+	hash := sha1.Sum([]byte(ts))
+-------+	return fmt.Sprintf("%06d-%06d-%s", rnd.Int64(), ctr%1_000_000, hex.EncodeToString(hash[:6])), nil
+------- }
+-------diff --git a/src/query-performance-monitoring/common-utils/constants.go b/src/query-performance-monitoring/common-utils/constants.go
+-------index 3d99394..ea4cb49 100644
+---------- a/src/query-performance-monitoring/common-utils/constants.go
+-------+++ b/src/query-performance-monitoring/common-utils/constants.go
+-------@@ -2,21 +2,25 @@ package commonutils
+------- 
+------- import "errors"
+------- 
+--------// The maximum number of metrics to be published in a single batch
+--------const PublishThreshold = 600
+--------const RandomIntRange = 1000000
+--------const TimeFormat = "20060102150405"
+-------+const (
+-------+	PublishThreshold                    = 600
+-------+	RandomIntRange                      = 1_000_000
+-------+	TimeFormat                          = "20060102150405"
+-------+	MaxIndividualQueryCountThreshold    = 10
+-------+	ExplainTPS                          = 5
+-------+	DefaultStatementTimeoutMilliseconds = 5000
+-------+)
+------- 
+--------// The maximum number of individual queries that can be fetched in a single metrics, the value was chosen as the queries samples were with same query statements but with different parameters so 10 samples would be enough to check the execution plan
+--------const MaxIndividualQueryCountThreshold = 10
+-------+var (
+-------+	ErrUnsupportedVersion = errors.New("unsupported PostgreSQL version")
+-------+	ErrUnExpectedError    = errors.New("unexpected error")
+-------+	ErrInvalidModelType   = errors.New("invalid model type")
+-------+	ErrNotEligible        = errors.New("not eligible to fetch metrics")
+-------+)
+------- 
+--------var ErrUnsupportedVersion = errors.New("unsupported PostgreSQL version")
+--------var ErrUnExpectedError = errors.New("unexpected error")
+--------
+--------var ErrInvalidModelType = errors.New("invalid model type")
+--------var ErrNotEligible = errors.New("not Eligible to fetch metrics")
+--------
+--------const PostgresVersion12 = 12
+--------const PostgresVersion11 = 11
+--------const PostgresVersion13 = 13
+--------const PostgresVersion14 = 14
+-------+const (
+-------+	PostgresVersion11 = 11
+-------+	PostgresVersion12 = 12
+-------+	PostgresVersion13 = 13
+-------+	PostgresVersion14 = 14
+-------+)
+-------diff --git a/src/query-performance-monitoring/common-utils/ingestion-helpers.go b/src/query-performance-monitoring/common-utils/ingestion-helpers.go
+-------index b6cf01f..f1db736 100644
+---------- a/src/query-performance-monitoring/common-utils/ingestion-helpers.go
+-------+++ b/src/query-performance-monitoring/common-utils/ingestion-helpers.go
+-------@@ -3,118 +3,107 @@ package commonutils
+------- import (
+------- 	"fmt"
+------- 	"reflect"
+--------
+--------	commonparameters "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
+-------+	"sync"
+------- 
+------- 	"github.com/newrelic/infra-integrations-sdk/v3/data/metric"
+------- 	"github.com/newrelic/infra-integrations-sdk/v3/integration"
+------- 	"github.com/newrelic/infra-integrations-sdk/v3/log"
+-------+	commonparams "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
+------- )
+------- 
+--------func SetMetric(metricSet *metric.Set, name string, value interface{}, sourceType string) {
+--------	switch sourceType {
+--------	case `gauge`:
+--------		err := metricSet.SetMetric(name, value, metric.GAUGE)
+--------		if err != nil {
+--------			log.Error("Error setting metric: %v", err)
+--------			return
+--------		}
+--------	case `attribute`:
+--------		err := metricSet.SetMetric(name, value, metric.ATTRIBUTE)
+--------		if err != nil {
+--------			log.Error("Error setting metric: %v", err)
+--------			return
+--------		}
+--------	default:
+--------		err := metricSet.SetMetric(name, value, metric.GAUGE)
+--------		if err != nil {
+--------			log.Error("Error setting metric: %v", err)
+--------			return
+--------		}
+--------	}
+-------+var (
+-------+	typeCache   sync.Map // reflect.Type → []fieldDesc
+-------+	entityCache sync.Map // "host:port" → *integration.Entity
+-------+)
+-------+
+-------+type fieldDesc struct {
+-------+	name string
+-------+	kind metric.SourceType
+-------+	idx  int
+------- }
+------- 
+--------// IngestMetric is a util by which we publish data in batches .Reason for this is to avoid publishing large data in one go and its a limitation for NewRelic.
+--------func IngestMetric(metricList []interface{}, eventName string, pgIntegration *integration.Integration, cp *commonparameters.CommonParameters) error {
+--------	instanceEntity, err := CreateEntity(pgIntegration, cp)
+--------	if err != nil {
+--------		log.Error("Error creating entity: %v", err)
+--------		return err
+-------+func describe(t reflect.Type) []fieldDesc {
+-------+	if v, ok := typeCache.Load(t); ok {
+-------+		return v.([]fieldDesc)
+------- 	}
+--------
+--------	metricCount := 0
+--------
+--------	for _, model := range metricList {
+--------		if model == nil {
+-------+	var list []fieldDesc
+-------+	for i := 0; i < t.NumField(); i++ {
+-------+		f := t.Field(i)
+-------+		if f.Tag.Get("ingest_data") == "false" {
+------- 			continue
+------- 		}
+--------		metricCount += 1
+--------		metricSet := instanceEntity.NewMetricSet(eventName)
+-------+		st := metric.GAUGE
+-------+		if f.Tag.Get("source_type") == "attribute" {
+-------+			st = metric.ATTRIBUTE
+-------+		}
+-------+		list = append(list, fieldDesc{
+-------+			name: f.Tag.Get("metric_name"), kind: st, idx: i,
+-------+		})
+-------+	}
+-------+	typeCache.Store(t, list)
+-------+	return list
+-------+}
+------- 
+--------		processErr := ProcessModel(model, metricSet)
+--------		if processErr != nil {
+--------			log.Error("Error processing model: %v", processErr)
+-------+func ProcessModel(model interface{}, ms *metric.Set) error {
+-------+	val := reflect.ValueOf(model)
+-------+	if val.Kind() == reflect.Ptr {
+-------+		val = val.Elem()
+-------+	}
+-------+	if val.Kind() != reflect.Struct {
+-------+		return ErrInvalidModelType
+-------+	}
+-------+	for _, fd := range describe(val.Type()) {
+-------+		fv := val.Field(fd.idx)
+-------+		if fv.Kind() == reflect.Ptr && fv.IsNil() {
+------- 			continue
+------- 		}
+--------
+--------		if metricCount == PublishThreshold {
+--------			metricCount = 0
+--------			if err := PublishMetrics(pgIntegration, &instanceEntity, cp); err != nil {
+--------				log.Error("Error publishing metrics: %v", err)
+--------				return err
+--------			}
+-------+		if fv.Kind() == reflect.Ptr {
+-------+			fv = fv.Elem()
+------- 		}
+--------	}
+--------	if metricCount > 0 {
+--------		if err := PublishMetrics(pgIntegration, &instanceEntity, cp); err != nil {
+--------			log.Error("Error publishing metrics: %v", err)
+--------			return err
+-------+		if err := ms.SetMetric(fd.name, fv.Interface(), fd.kind); err != nil {
+-------+			log.Debug("setMetric %s: %v", fd.name, err)
+------- 		}
+------- 	}
+------- 	return nil
+------- }
+------- 
+--------func CreateEntity(pgIntegration *integration.Integration, cp *commonparameters.CommonParameters) (*integration.Entity, error) {
+--------	return pgIntegration.Entity(fmt.Sprintf("%s:%s", cp.Host, cp.Port), "pg-instance")
+--------}
+--------
+--------func ProcessModel(model interface{}, metricSet *metric.Set) error {
+--------	modelValue := reflect.ValueOf(model)
+--------	if modelValue.Kind() == reflect.Ptr {
+--------		modelValue = modelValue.Elem()
+-------+func CreateEntity(pgInt *integration.Integration, cp *commonparams.CommonParameters) (*integration.Entity, error) {
+-------+	key := fmt.Sprintf("%s:%s", cp.Host, cp.Port)
+-------+	if v, ok := entityCache.Load(key); ok {
+-------+		return v.(*integration.Entity), nil
+------- 	}
+--------	if !modelValue.IsValid() || modelValue.Kind() != reflect.Struct {
+--------		log.Error("Invalid model type: %v", modelValue.Kind())
+--------		return ErrInvalidModelType
+-------+	ent, err := pgInt.Entity(key, "pg-instance")
+-------+	if err != nil {
+-------+		return nil, err
+------- 	}
+-------+	entityCache.Store(key, ent)
+-------+	return ent, nil
+-------+}
+------- 
+--------	modelType := reflect.TypeOf(model)
+--------
+--------	for i := 0; i < modelValue.NumField(); i++ {
+--------		field := modelValue.Field(i)
+--------		fieldType := modelType.Field(i)
+--------		metricName := fieldType.Tag.Get("metric_name")
+--------		sourceType := fieldType.Tag.Get("source_type")
+--------		ingestData := fieldType.Tag.Get("ingest_data")
+--------
+--------		if ingestData == "false" {
+-------+func IngestMetric(list []interface{}, evt string, pgInt *integration.Integration, cp *commonparams.CommonParameters) error {
+-------+	ent, err := CreateEntity(pgInt, cp)
+-------+	if err != nil {
+-------+		return err
+-------+	}
+-------+	batch := 0
+-------+	for _, m := range list {
+-------+		if m == nil {
+------- 			continue
+------- 		}
+--------
+--------		if field.Kind() == reflect.Ptr && !field.IsNil() {
+--------			SetMetric(metricSet, metricName, field.Elem().Interface(), sourceType)
+--------		} else if field.Kind() != reflect.Ptr {
+--------			SetMetric(metricSet, metricName, field.Interface(), sourceType)
+-------+		ms := ent.NewMetricSet(evt)
+-------+		if err := ProcessModel(m, ms); err != nil {
+-------+			log.Error("ProcessModel: %v", err)
+-------+		}
+-------+		batch++
+-------+		if batch >= PublishThreshold {
+-------+			if err := pgInt.Publish(); err != nil {
+-------+				return err
+-------+			}
+-------+			batch = 0
+------- 		}
+------- 	}
+--------	return nil
+--------}
+--------
+--------func PublishMetrics(pgIntegration *integration.Integration, instanceEntity **integration.Entity, cp *commonparameters.CommonParameters) error {
+--------	if err := pgIntegration.Publish(); err != nil {
+--------		return err
+-------+	if batch > 0 {
+-------+		return pgInt.Publish()
+------- 	}
+--------	var err error
+--------	*instanceEntity, err = CreateEntity(pgIntegration, cp)
+--------	return err
+-------+	return nil
+------- }
+-------diff --git a/src/query-performance-monitoring/common-utils/query_fetch_helpers.go b/src/query-performance-monitoring/common-utils/query_fetch_helpers.go
+-------index b2409eb..149ab2e 100644
+---------- a/src/query-performance-monitoring/common-utils/query_fetch_helpers.go
+-------+++ b/src/query-performance-monitoring/common-utils/query_fetch_helpers.go
+-------@@ -1,36 +1,34 @@
+------- package commonutils
+------- 
+--------import (
+--------	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/queries"
+--------)
+-------+import "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/queries"
+------- 
+--------func FetchVersionSpecificSlowQueries(version uint64) (string, error) {
+-------+func FetchVersionSpecificSlowQueries(v uint64) (string, error) {
+------- 	switch {
+--------	case version == PostgresVersion12:
+-------+	case v == PostgresVersion12:
+------- 		return queries.SlowQueriesForV12, nil
+--------	case version >= PostgresVersion13:
+-------+	case v >= PostgresVersion13:
+------- 		return queries.SlowQueriesForV13AndAbove, nil
+------- 	default:
+------- 		return "", ErrUnsupportedVersion
+------- 	}
+------- }
+------- 
+--------func FetchVersionSpecificBlockingQueries(version uint64) (string, error) {
+-------+func FetchVersionSpecificBlockingQueries(v uint64) (string, error) {
+------- 	switch {
+--------	case version == PostgresVersion12, version == PostgresVersion13:
+-------+	case v == PostgresVersion12 || v == PostgresVersion13:
+------- 		return queries.BlockingQueriesForV12AndV13, nil
+--------	case version >= PostgresVersion14:
+-------+	case v >= PostgresVersion14:
+------- 		return queries.BlockingQueriesForV14AndAbove, nil
+------- 	default:
+------- 		return "", ErrUnsupportedVersion
+------- 	}
+------- }
+------- 
+--------func FetchVersionSpecificIndividualQueries(version uint64) (string, error) {
+-------+func FetchVersionSpecificIndividualQueries(v uint64) (string, error) {
+------- 	switch {
+--------	case version == PostgresVersion12:
+-------+	case v == PostgresVersion12:
+------- 		return queries.IndividualQuerySearchV12, nil
+--------	case version > PostgresVersion12:
+-------+	case v > PostgresVersion12:
+------- 		return queries.IndividualQuerySearchV13AndAbove, nil
+------- 	default:
+------- 		return "", ErrUnsupportedVersion
+-------diff --git a/src/query-performance-monitoring/datamodels/performance_data_models.go b/src/query-performance-monitoring/datamodels/performance_data_models.go
+-------index 16f4614..521ee1d 100644
+---------- a/src/query-performance-monitoring/datamodels/performance_data_models.go
+-------+++ b/src/query-performance-monitoring/datamodels/performance_data_models.go
+-------@@ -1,66 +1,68 @@
+------- package datamodels
+------- 
+------- type SlowRunningQueryMetrics struct {
+--------	Newrelic            *string  `db:"newrelic"              metric_name:"newrelic"                   source_type:"attribute"  ingest_data:"false"`
+--------	QueryID             *string  `db:"query_id"              metric_name:"query_id"                   source_type:"attribute"`
+--------	QueryText           *string  `db:"query_text"            metric_name:"query_text"                 source_type:"attribute"`
+--------	DatabaseName        *string  `db:"database_name"         metric_name:"database_name"              source_type:"attribute"`
+--------	SchemaName          *string  `db:"schema_name"           metric_name:"schema_name"                source_type:"attribute"`
+--------	ExecutionCount      *int64   `db:"execution_count"       metric_name:"execution_count"            source_type:"gauge"`
+--------	AvgElapsedTimeMs    *float64 `db:"avg_elapsed_time_ms"   metric_name:"avg_elapsed_time_ms"        source_type:"gauge"`
+--------	AvgDiskReads        *float64 `db:"avg_disk_reads"        metric_name:"avg_disk_reads"             source_type:"gauge"`
+--------	AvgDiskWrites       *float64 `db:"avg_disk_writes"       metric_name:"avg_disk_writes"            source_type:"gauge"`
+--------	StatementType       *string  `db:"statement_type"        metric_name:"statement_type"             source_type:"attribute"`
+--------	CollectionTimestamp *string  `db:"collection_timestamp"  metric_name:"collection_timestamp"       source_type:"attribute"`
+-------+	Newrelic            *string  `db:"newrelic"              metric_name:"newrelic"     source_type:"attribute" ingest_data:"false"`
+-------+	QueryID             *string  `db:"query_id"              metric_name:"query_id"     source_type:"attribute"`
+-------+	QueryText           *string  `db:"query_text"            metric_name:"query_text"   source_type:"attribute"`
+-------+	DatabaseName        *string  `db:"database_name"         metric_name:"database_name"source_type:"attribute"`
+-------+	SchemaName          *string  `db:"schema_name"           metric_name:"schema_name"  source_type:"attribute"`
+-------+	ExecutionCount      *int64   `db:"execution_count"       metric_name:"execution_count" source_type:"gauge"`
+-------+	AvgElapsedTimeMs    *float64 `db:"avg_elapsed_time_ms"   metric_name:"avg_elapsed_time_ms" source_type:"gauge"`
+-------+	AvgDiskReads        *float64 `db:"avg_disk_reads"        metric_name:"avg_disk_reads" source_type:"gauge"`
+-------+	AvgDiskWrites       *float64 `db:"avg_disk_writes"       metric_name:"avg_disk_writes" source_type:"gauge"`
+-------+	StatementType       *string  `db:"statement_type"        metric_name:"statement_type" source_type:"attribute"`
+-------+	CollectionTimestamp *string  `db:"collection_timestamp"  metric_name:"collection_timestamp" source_type:"attribute"`
+------- }
+-------+
+------- type WaitEventMetrics struct {
+--------	WaitEventName       *string  `db:"wait_event_name"       metric_name:"wait_event_name"            source_type:"attribute"`
+--------	WaitCategory        *string  `db:"wait_category"         metric_name:"wait_category"              source_type:"attribute"`
+--------	TotalWaitTimeMs     *float64 `db:"total_wait_time_ms"    metric_name:"total_wait_time_ms"         source_type:"gauge"`
+--------	CollectionTimestamp *string  `db:"collection_timestamp"  metric_name:"collection_timestamp"       source_type:"attribute"`
+--------	QueryID             *string  `db:"query_id"              metric_name:"query_id"                   source_type:"attribute"`
+--------	QueryText           *string  `db:"query_text"            metric_name:"query_text"                 source_type:"attribute"`
+--------	DatabaseName        *string  `db:"database_name"         metric_name:"database_name"              source_type:"attribute"`
+-------+	WaitEventName       *string  `db:"wait_event_name"       metric_name:"wait_event_name" source_type:"attribute"`
+-------+	WaitCategory        *string  `db:"wait_category"         metric_name:"wait_category"   source_type:"attribute"`
+-------+	TotalWaitTimeMs     *float64 `db:"total_wait_time_ms"    metric_name:"total_wait_time_ms" source_type:"gauge"`
+-------+	CollectionTimestamp *string  `db:"collection_timestamp"  metric_name:"collection_timestamp" source_type:"attribute"`
+-------+	QueryID             *string  `db:"query_id"              metric_name:"query_id"       source_type:"attribute"`
+-------+	QueryText           *string  `db:"query_text"            metric_name:"query_text"     source_type:"attribute"`
+-------+	DatabaseName        *string  `db:"database_name"         metric_name:"database_name" source_type:"attribute"`
+------- }
+-------+
+------- type BlockingSessionMetrics struct {
+--------	Newrelic           *string `db:"newrelic"              metric_name:"newrelic"            source_type:"attribute"  ingest_data:"false"`
+--------	BlockedPid         *int64  `db:"blocked_pid"          metric_name:"blocked_pid"          source_type:"gauge"`
+--------	BlockedQuery       *string `db:"blocked_query"        metric_name:"blocked_query"        source_type:"attribute"`
+--------	BlockedQueryID     *string `db:"blocked_query_id"     metric_name:"blocked_query_id"     source_type:"attribute"`
+--------	BlockedQueryStart  *string `db:"blocked_query_start"  metric_name:"blocked_query_start"  source_type:"attribute"`
+--------	BlockedDatabase    *string `db:"database_name"        metric_name:"database_name"        source_type:"attribute"`
+--------	BlockingPid        *int64  `db:"blocking_pid"         metric_name:"blocking_pid"         source_type:"gauge"`
+--------	BlockingQuery      *string `db:"blocking_query"       metric_name:"blocking_query"       source_type:"attribute"`
+--------	BlockingQueryID    *string `db:"blocking_query_id"    metric_name:"blocking_query_id"    source_type:"attribute"`
+--------	BlockingQueryStart *string `db:"blocking_query_start" metric_name:"blocking_query_start" source_type:"attribute"`
+-------+	Newrelic           *string `db:"newrelic"              metric_name:"newrelic"        source_type:"attribute" ingest_data:"false"`
+-------+	BlockedPid         *int64  `db:"blocked_pid"           metric_name:"blocked_pid"     source_type:"gauge"`
+-------+	BlockedQuery       *string `db:"blocked_query"         metric_name:"blocked_query"   source_type:"attribute"`
+-------+	BlockedQueryID     *string `db:"blocked_query_id"      metric_name:"blocked_query_id" source_type:"attribute"`
+-------+	BlockedQueryStart  *string `db:"blocked_query_start"   metric_name:"blocked_query_start" source_type:"attribute"`
+-------+	BlockedDatabase    *string `db:"database_name"         metric_name:"database_name"   source_type:"attribute"`
+-------+	BlockingPid        *int64  `db:"blocking_pid"          metric_name:"blocking_pid"    source_type:"gauge"`
+-------+	BlockingQuery      *string `db:"blocking_query"        metric_name:"blocking_query"  source_type:"attribute"`
+-------+	BlockingQueryID    *string `db:"blocking_query_id"     metric_name:"blocking_query_id" source_type:"attribute"`
+-------+	BlockingQueryStart *string `db:"blocking_query_start"  metric_name:"blocking_query_start" source_type:"attribute"`
+------- }
+------- 
+------- type IndividualQueryMetrics struct {
+--------	QueryText       *string  `json:"query" db:"query" metric_name:"query_text" source_type:"attribute"`
+--------	QueryID         *string  `json:"queryid" db:"queryid" metric_name:"query_id" source_type:"attribute"`
+--------	DatabaseName    *string  `json:"datname" db:"datname" metric_name:"database_name" source_type:"attribute"`
+--------	AvgCPUTimeInMS  *float64 `json:"cpu_time_ms" db:"cpu_time_ms" metric_name:"cpu_time_ms" source_type:"gauge"`
+--------	PlanID          *string  `json:"planid" db:"planid" metric_name:"plan_id" source_type:"attribute"`
+-------+	QueryText       *string  `db:"query"         metric_name:"query_text"     source_type:"attribute"`
+-------+	QueryID         *string  `db:"queryid"       metric_name:"query_id"       source_type:"attribute"`
+-------+	DatabaseName    *string  `db:"datname"       metric_name:"database_name"  source_type:"attribute"`
+-------+	AvgCPUTimeInMS  *float64 `db:"cpu_time_ms"   metric_name:"cpu_time_ms"    source_type:"gauge"`
+-------+	PlanID          *string  `db:"planid"        metric_name:"plan_id"        source_type:"attribute"`
+------- 	RealQueryText   *string  `ingest_data:"false"`
+--------	AvgExecTimeInMs *float64 `json:"exec_time_ms" db:"exec_time_ms" metric_name:"exec_time_ms" source_type:"gauge"`
+--------	Newrelic        *string  `db:"newrelic"              metric_name:"newrelic"            source_type:"attribute"  ingest_data:"false"`
+-------+	AvgExecTimeInMs *float64 `db:"exec_time_ms"  metric_name:"exec_time_ms"    source_type:"gauge"`
+-------+	Newrelic        *string  `db:"newrelic"      metric_name:"newrelic"        source_type:"attribute" ingest_data:"false"`
+------- }
+------- 
+------- type QueryExecutionPlanMetrics struct {
+--------	NodeType            string  `mapstructure:"Node Type"           json:"Node Type"           metric_name:"node_type"             source_type:"attribute"`
+--------	ParallelAware       bool    `mapstructure:"Parallel Aware"      json:"Parallel Aware"      metric_name:"parallel_aware"       source_type:"gauge"`
+--------	AsyncCapable        bool    `mapstructure:"Async Capable"       json:"Async Capable"       metric_name:"async_capable"        source_type:"gauge"`
+--------	ScanDirection       string  `mapstructure:"Scan Direction"      json:"Scan Direction"      metric_name:"scan_direction"       source_type:"attribute"`
+--------	IndexName           string  `mapstructure:"Index Name"          json:"Index Name"          metric_name:"index_name"           source_type:"attribute"`
+--------	RelationName        string  `mapstructure:"Relation Name"       json:"Relation Name"       metric_name:"relation_name"        source_type:"attribute"`
+--------	Alias               string  `mapstructure:"Alias"               json:"Alias"               metric_name:"alias"                source_type:"attribute"`
+--------	StartupCost         float64 `mapstructure:"Startup Cost"        json:"Startup Cost"        metric_name:"startup_cost"         source_type:"gauge"`
+--------	TotalCost           float64 `mapstructure:"Total Cost"          json:"Total Cost"          metric_name:"total_cost"           source_type:"gauge"`
+--------	PlanRows            int64   `mapstructure:"Plan Rows"           json:"Plan Rows"           metric_name:"plan_rows"            source_type:"gauge"`
+--------	PlanWidth           int64   `mapstructure:"Plan Width"          json:"Plan Width"          metric_name:"plan_width"           source_type:"gauge"`
+--------	RowsRemovedByFilter int64   `mapstructure:"Rows Removed by Filter" json:"Rows Removed by Filter" metric_name:"rows_removed_by_filter" source_type:"gauge"`
+--------	DatabaseName        string  `mapstructure:"Database"            json:"Database"            metric_name:"database_name"        source_type:"attribute"`
+--------	QueryID             string  `mapstructure:"Query Id"            json:"Query Id"            metric_name:"query_id"             source_type:"attribute"`
+--------	PlanID              string  `mapstructure:"Plan Id"             json:"Plan Id"             metric_name:"plan_id"              source_type:"attribute"`
+--------	Level               int     `mapstructure:"Level"               json:"Level"               metric_name:"level_id"             source_type:"gauge"`
+-------+	NodeType            string  `metric_name:"node_type"             source_type:"attribute"`
+-------+	ParallelAware       bool    `metric_name:"parallel_aware"        source_type:"gauge"`
+-------+	AsyncCapable        bool    `metric_name:"async_capable"         source_type:"gauge"`
+-------+	ScanDirection       string  `metric_name:"scan_direction"        source_type:"attribute"`
+-------+	IndexName           string  `metric_name:"index_name"            source_type:"attribute"`
+-------+	RelationName        string  `metric_name:"relation_name"         source_type:"attribute"`
+-------+	Alias               string  `metric_name:"alias"                 source_type:"attribute"`
+-------+	StartupCost         float64 `metric_name:"startup_cost"          source_type:"gauge"`
+-------+	TotalCost           float64 `metric_name:"total_cost"            source_type:"gauge"`
+-------+	PlanRows            int64   `metric_name:"plan_rows"             source_type:"gauge"`
+-------+	PlanWidth           int64   `metric_name:"plan_width"            source_type:"gauge"`
+-------+	RowsRemovedByFilter int64   `metric_name:"rows_removed_by_filter" source_type:"gauge"`
+-------+	DatabaseName        string  `metric_name:"database_name"         source_type:"attribute"`
+-------+	QueryID             string  `metric_name:"query_id"              source_type:"attribute"`
+-------+	PlanID              string  `metric_name:"plan_id"               source_type:"attribute"`
+-------+	Level               int     `metric_name:"level_id"              source_type:"gauge"`
+------- }
+-------diff --git a/src/query-performance-monitoring/performance-metrics/slow_query_metrics.go b/src/query-performance-monitoring/performance-metrics/slow_query_metrics.go
+-------index 6b7adf5..83f526c 100644
+---------- a/src/query-performance-monitoring/performance-metrics/slow_query_metrics.go
+-------+++ b/src/query-performance-monitoring/performance-metrics/slow_query_metrics.go
+-------@@ -1,67 +1,68 @@
+------- package performancemetrics
+------- 
+------- import (
+-------+	"context"
+------- 	"fmt"
+-------+	"time"
+------- 
+------- 	"github.com/newrelic/infra-integrations-sdk/v3/integration"
+------- 	"github.com/newrelic/infra-integrations-sdk/v3/log"
+--------	performancedbconnection "github.com/newrelic/nri-postgresql/src/connection"
+--------	commonparameters "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
+-------+	connpkg "github.com/newrelic/nri-postgresql/src/connection"
+-------+	commonparams "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
+------- 	commonutils "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-utils"
+------- 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/datamodels"
+------- 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/validations"
+------- )
+------- 
+--------func getSlowRunningMetrics(conn *performancedbconnection.PGSQLConnection, cp *commonparameters.CommonParameters) ([]datamodels.SlowRunningQueryMetrics, []interface{}, error) {
+--------	var slowQueryMetricsList []datamodels.SlowRunningQueryMetrics
+--------	var slowQueryMetricsListInterface []interface{}
+--------	versionSpecificSlowQuery, err := commonutils.FetchVersionSpecificSlowQueries(cp.Version)
+--------	if err != nil {
+--------		log.Error("Unsupported postgres version: %v", err)
+--------		return nil, nil, err
+--------	}
+--------	var query = fmt.Sprintf(versionSpecificSlowQuery, cp.Databases, cp.QueryMonitoringCountThreshold)
+--------	rows, err := conn.Queryx(query)
+--------	if err != nil {
+--------		return nil, nil, err
+-------+func PopulateSlowRunningMetrics(conn *connpkg.PGSQLConnection, pgInt *integration.Integration, cp *commonparams.CommonParameters, exts map[string]bool) []datamodels.SlowRunningQueryMetrics {
+-------+	if ok, _ := validations.CheckSlowQueryMetricsFetchEligibility(exts); !ok {
+-------+		return nil
+------- 	}
+--------	defer rows.Close()
+--------	for rows.Next() {
+--------		var slowQuery datamodels.SlowRunningQueryMetrics
+--------		if scanErr := rows.StructScan(&slowQuery); scanErr != nil {
+--------			return nil, nil, err
+--------		}
+--------		slowQueryMetricsList = append(slowQueryMetricsList, slowQuery)
+--------		slowQueryMetricsListInterface = append(slowQueryMetricsListInterface, slowQuery)
+-------+	if len(cp.Databases) == 0 {
+-------+		return nil
+------- 	}
+--------	return slowQueryMetricsList, slowQueryMetricsListInterface, nil
+--------}
+------- 
+--------func PopulateSlowRunningMetrics(conn *performancedbconnection.PGSQLConnection, pgIntegration *integration.Integration, cp *commonparameters.CommonParameters, enabledExtensions map[string]bool) []datamodels.SlowRunningQueryMetrics {
+--------	isEligible, err := validations.CheckSlowQueryMetricsFetchEligibility(enabledExtensions)
+-------+	list, iface, err := getSlowRunningMetrics(conn, cp)
+------- 	if err != nil {
+--------		log.Error("Error executing query: %v", err)
+-------+		log.Error("slow query fetch: %v", err)
+------- 		return nil
+------- 	}
+--------	if !isEligible {
+--------		log.Debug("Extension 'pg_stat_statements' is not enabled or unsupported version.")
+-------+	if len(list) == 0 {
+------- 		return nil
+------- 	}
+------- 
+--------	slowQueryMetricsList, slowQueryMetricsListInterface, err := getSlowRunningMetrics(conn, cp)
+--------	if err != nil {
+--------		log.Error("Error fetching slow-running queries: %v", err)
+--------		return nil
+-------+	if err := commonutils.IngestMetric(iface, "PostgresSlowQueries", pgInt, cp); err != nil {
+-------+		log.Error("ingest slow queries: %v", err)
+------- 	}
+-------+	return list
+-------+}
+------- 
+--------	if len(slowQueryMetricsList) == 0 {
+--------		log.Debug("No slow-running queries found.")
+--------		return nil
+-------+func getSlowRunningMetrics(conn *connpkg.PGSQLConnection, cp *commonparams.CommonParameters) ([]datamodels.SlowRunningQueryMetrics, []interface{}, error) {
+-------+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+-------+	defer cancel()
+-------+
+-------+	tpl, err := commonutils.FetchVersionSpecificSlowQueries(cp.Version)
+-------+	if err != nil {
+-------+		return nil, nil, err
+------- 	}
+--------	err = commonutils.IngestMetric(slowQueryMetricsListInterface, "PostgresSlowQueries", pgIntegration, cp)
+-------+
+-------+	query := fmt.Sprintf(tpl, cp.Databases, cp.QueryMonitoringCountThreshold)
+-------+	rows, err := conn.QueryxContext(ctx, query)
+------- 	if err != nil {
+--------		log.Error("Error ingesting slow-running queries: %v", err)
+--------		return nil
+-------+		return nil, nil, err
+-------+	}
+-------+	defer rows.Close()
+-------+
+-------+	var list []datamodels.SlowRunningQueryMetrics
+-------+	var iface []interface{}
+-------+
+-------+	for rows.Next() {
+-------+		var m datamodels.SlowRunningQueryMetrics
+-------+		if err := rows.StructScan(&m); err != nil {
+-------+			return nil, nil, err
+-------+		}
+-------+		list = append(list, m)
+-------+		iface = append(iface, m)
+------- 	}
+--------	return slowQueryMetricsList
+-------+	return list, iface, nil
+------- }
+-------diff --git a/src/query-performance-monitoring/performance-metrics/wait_event_metrics.go b/src/query-performance-monitoring/performance-metrics/wait_event_metrics.go
+-------index b1a8ea5..eea1467 100644
+---------- a/src/query-performance-monitoring/performance-metrics/wait_event_metrics.go
+-------+++ b/src/query-performance-monitoring/performance-metrics/wait_event_metrics.go
+-------@@ -1,61 +1,58 @@
+------- package performancemetrics
+------- 
+------- import (
+-------+	"context"
+------- 	"fmt"
+-------+	"time"
+------- 
+------- 	"github.com/newrelic/infra-integrations-sdk/v3/integration"
+------- 	"github.com/newrelic/infra-integrations-sdk/v3/log"
+--------	performancedbconnection "github.com/newrelic/nri-postgresql/src/connection"
+--------	commonparameters "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
+-------+	connpkg "github.com/newrelic/nri-postgresql/src/connection"
+-------+	commonparams "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
+------- 	commonutils "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-utils"
+------- 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/datamodels"
+------- 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/queries"
+------- 	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/validations"
+------- )
+------- 
+--------func PopulateWaitEventMetrics(conn *performancedbconnection.PGSQLConnection, pgIntegration *integration.Integration, cp *commonparameters.CommonParameters, enabledExtensions map[string]bool) error {
+--------	var isEligible bool
+--------	var eligibleCheckErr error
+--------	isEligible, eligibleCheckErr = validations.CheckWaitEventMetricsFetchEligibility(enabledExtensions)
+--------	if eligibleCheckErr != nil {
+--------		log.Error("Error executing query: %v", eligibleCheckErr)
+--------		return commonutils.ErrUnExpectedError
+--------	}
+--------	if !isEligible {
+--------		log.Debug("Extension 'pg_wait_sampling' or 'pg_stat_statement' is not enabled or unsupported version.")
+--------		return commonutils.ErrNotEligible
+--------	}
+--------	waitEventMetricsList, waitEventErr := getWaitEventMetrics(conn, cp)
+--------	if waitEventErr != nil {
+--------		log.Error("Error fetching wait event queries: %v", waitEventErr)
+--------		return commonutils.ErrUnExpectedError
+-------+func PopulateWaitEventMetrics(conn *connpkg.PGSQLConnection, pgInt *integration.Integration, cp *commonparams.CommonParameters, exts map[string]bool) error {
+-------+	if ok, _ := validations.CheckWaitEventMetricsFetchEligibility(exts); !ok {
+-------+		return nil
+------- 	}
+--------	if len(waitEventMetricsList) == 0 {
+--------		log.Debug("No wait event queries found.")
+-------+	if len(cp.Databases) == 0 {
+------- 		return nil
+------- 	}
+--------	err := commonutils.IngestMetric(waitEventMetricsList, "PostgresWaitEvents", pgIntegration, cp)
+-------+
+-------+	iface, err := getWaitEventMetrics(conn, cp)
+------- 	if err != nil {
+--------		log.Error("Error ingesting wait event queries: %v", err)
+-------+		log.Error("wait-event fetch: %v", err)
+------- 		return err
+------- 	}
+--------	return nil
+-------+	if len(iface) == 0 {
+-------+		return nil
+-------+	}
+-------+
+-------+	return commonutils.IngestMetric(iface, "PostgresWaitEvents", pgInt, cp)
+------- }
+------- 
+--------func getWaitEventMetrics(conn *performancedbconnection.PGSQLConnection, cp *commonparameters.CommonParameters) ([]interface{}, error) {
+--------	var waitEventMetricsList []interface{}
+--------	var query = fmt.Sprintf(queries.WaitEvents, cp.Databases, cp.QueryMonitoringCountThreshold)
+--------	rows, err := conn.Queryx(query)
+-------+func getWaitEventMetrics(conn *connpkg.PGSQLConnection, cp *commonparams.CommonParameters) ([]interface{}, error) {
+-------+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+-------+	defer cancel()
+-------+
+-------+	query := fmt.Sprintf(queries.WaitEvents, cp.Databases, cp.QueryMonitoringCountThreshold)
+-------+	rows, err := conn.QueryxContext(ctx, query)
+------- 	if err != nil {
+------- 		return nil, err
+------- 	}
+------- 	defer rows.Close()
+-------+
+-------+	var out []interface{}
+------- 	for rows.Next() {
+--------		var waitEvent datamodels.WaitEventMetrics
+--------		if waitScanErr := rows.StructScan(&waitEvent); waitScanErr != nil {
+-------+		var m datamodels.WaitEventMetrics
+-------+		if err := rows.StructScan(&m); err != nil {
+------- 			return nil, err
+------- 		}
+--------		waitEventMetricsList = append(waitEventMetricsList, waitEvent)
+-------+		out = append(out, m)
+------- 	}
+--------	return waitEventMetricsList, nil
+-------+	return out, nil
+------- }
+-------diff --git a/src/query-performance-monitoring/query_performance_main.go b/src/query-performance-monitoring/query_performance_main.go
+-------index 8640f5c..6365224 100644
+---------- a/src/query-performance-monitoring/query_performance_main.go
+-------+++ b/src/query-performance-monitoring/query_performance_main.go
+-------@@ -1,79 +1,83 @@
+------- package queryperformancemonitoring
+------- 
+--------// this is the main go file for the query_monitoring package
+------- import (
+-------+	"context"
+------- 	"time"
+------- 
+--------	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/validations"
+--------
+--------	common_parameters "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
+--------
+------- 	"github.com/newrelic/infra-integrations-sdk/v3/integration"
+------- 	"github.com/newrelic/infra-integrations-sdk/v3/log"
+------- 	"github.com/newrelic/nri-postgresql/src/args"
+------- 	"github.com/newrelic/nri-postgresql/src/collection"
+--------	performancedbconnection "github.com/newrelic/nri-postgresql/src/connection"
+-------+	connpkg "github.com/newrelic/nri-postgresql/src/connection"
+------- 	"github.com/newrelic/nri-postgresql/src/metrics"
+-------+
+-------+	commonparams "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-parameters"
+------- 	commonutils "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/common-utils"
+------- 	performancemetrics "github.com/newrelic/nri-postgresql/src/query-performance-monitoring/performance-metrics"
+-------+	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/selfmetrics"
+-------+	"github.com/newrelic/nri-postgresql/src/query-performance-monitoring/validations"
+------- )
+------- 
+--------func QueryPerformanceMain(args args.ArgumentList, pgIntegration *integration.Integration, databaseMap collection.DatabaseList) {
+--------	connectionInfo := performancedbconnection.DefaultConnectionInfo(&args)
+--------	if len(databaseMap) == 0 {
+--------		log.Debug("No databases found")
+-------+func QueryPerformanceMain(a args.ArgumentList, pgInt *integration.Integration, dbMap collection.DatabaseList) {
+-------+	if !a.EnableQueryMonitoring {
+-------+		log.Debug("query monitoring disabled by flag")
+------- 		return
+------- 	}
+--------	newConnection, err := connectionInfo.NewConnection(connectionInfo.DatabaseName())
+-------+	if len(dbMap) == 0 {
+-------+		log.Debug("no databases found")
+-------+		return
+-------+	}
+-------+
+-------+	connInfo := connpkg.DefaultConnectionInfo(&a)
+-------+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+-------+	defer cancel()
+-------+
+-------+	db, err := connInfo.NewConnection(connInfo.DatabaseName())
+------- 	if err != nil {
+--------		log.Error("Error creating connection: ", err)
+-------+		log.Error("connection error: %v", err)
+------- 		return
+------- 	}
+--------	defer newConnection.Close()
+-------+	defer db.Close()
+------- 
+--------	version, versionErr := metrics.CollectVersion(newConnection)
+--------	if versionErr != nil {
+--------		log.Error("Error fetching version: ", versionErr)
+-------+	ver, err := metrics.CollectVersion(ctx, db)
+-------+	if err != nil {
+-------+		log.Error("version detect: %v", err)
+------- 		return
+------- 	}
+--------	versionInt := version.Major
+--------	if !validations.CheckPostgresVersionSupportForQueryMonitoring(versionInt) {
+--------		log.Debug("Postgres version: %d is not supported for query monitoring", versionInt)
+-------+	if !validations.CheckPostgresVersionSupportForQueryMonitoring(ver.Major) {
+-------+		log.Debug("Postgres %d not supported", ver.Major)
+------- 		return
+------- 	}
+--------	cp := common_parameters.SetCommonParameters(args, versionInt, commonutils.GetDatabaseListInString(databaseMap))
+------- 
+--------	populateQueryPerformanceMetrics(newConnection, pgIntegration, cp, connectionInfo)
+-------+	cp := commonparams.SetCommonParameters(a, ver.Major, commonutils.GetDatabaseListInString(dbMap))
+-------+	populateQueryPerformance(ctx, db, pgInt, cp, connInfo)
+------- }
+------- 
+--------func populateQueryPerformanceMetrics(newConnection *performancedbconnection.PGSQLConnection, pgIntegration *integration.Integration, cp *common_parameters.CommonParameters, connectionInfo performancedbconnection.Info) {
+--------	enabledExtensions, err := validations.FetchAllExtensions(newConnection)
+-------+func populateQueryPerformance(ctx context.Context, db *connpkg.PGSQLConnection, pgInt *integration.Integration, cp *commonparams.CommonParameters, info connpkg.Info) {
+-------+	exts, err := validations.FetchAllExtensions(db)
+------- 	if err != nil {
+--------		log.Error("Error fetching extensions: ", err)
+-------+		log.Error("extension scan: %v", err)
+------- 		return
+------- 	}
+-------+
+------- 	start := time.Now()
+--------	log.Debug("Starting PopulateSlowRunningMetrics at ", start)
+--------	slowRunningQueries := performancemetrics.PopulateSlowRunningMetrics(newConnection, pgIntegration, cp, enabledExtensions)
+--------	log.Debug("PopulateSlowRunningMetrics completed in ", time.Since(start))
+-------+	slow := performancemetrics.PopulateSlowRunningMetrics(db, pgInt, cp, exts)
+-------+	selfmetrics.IncQueries()
+-------+	log.Debug("slow-running metrics in", time.Since(start))
+------- 
+------- 	start = time.Now()
+--------	log.Debug("Starting PopulateWaitEventMetrics at ", start)
+--------	_ = performancemetrics.PopulateWaitEventMetrics(newConnection, pgIntegration, cp, enabledExtensions)
+--------	log.Debug("PopulateWaitEventMetrics completed in ", time.Since(start))
+-------+	_ = performancemetrics.PopulateWaitEventMetrics(db, pgInt, cp, exts)
+-------+	log.Debug("wait-event metrics in", time.Since(start))
+------- 
+------- 	start = time.Now()
+--------	log.Debug("Starting PopulateBlockingMetrics at ", start)
+--------	performancemetrics.PopulateBlockingMetrics(newConnection, pgIntegration, cp, enabledExtensions)
+--------	log.Debug("PopulateBlockingMetrics completed in ", time.Since(start))
+-------+	performancemetrics.PopulateBlockingMetrics(db, pgInt, cp, exts)
+-------+	log.Debug("blocking metrics in", time.Since(start))
+------- 
+------- 	start = time.Now()
+--------	log.Debug("Starting PopulateIndividualQueryMetrics at ", start)
+--------	individualQueries := performancemetrics.PopulateIndividualQueryMetrics(newConnection, slowRunningQueries, pgIntegration, cp, enabledExtensions)
+--------	log.Debug("PopulateIndividualQueryMetrics completed in ", time.Since(start))
+-------+	iq := performancemetrics.PopulateIndividualQueryMetrics(db, slow, pgInt, cp, exts)
+-------+	log.Debug("individual-query metrics in", time.Since(start))
+------- 
+------- 	start = time.Now()
+--------	log.Debug("Starting PopulateExecutionPlanMetrics at ", start)
+--------	performancemetrics.PopulateExecutionPlanMetrics(individualQueries, pgIntegration, cp, connectionInfo)
+--------	log.Debug("PopulateExecutionPlanMetrics completed in ", time.Since(start))
+-------+	performancemetrics.PopulateExecutionPlanMetrics(iq, pgInt, cp, info)
+-------+	log.Debug("execution-plan metrics in", time.Since(start))
+------- }

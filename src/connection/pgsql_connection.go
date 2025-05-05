@@ -2,6 +2,7 @@
 package connection
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -100,6 +101,16 @@ func (p PGSQLConnection) Query(v interface{}, query string) error {
 // Queryx runs a query and returns a set of rows
 func (p PGSQLConnection) Queryx(query string) (*sqlx.Rows, error) {
 	return p.connection.Queryx(query)
+}
+
+// QueryContext runs a query with context and loads results into v
+func (p PGSQLConnection) QueryContext(ctx context.Context, v interface{}, query string) error {
+	return p.connection.SelectContext(ctx, v, query)
+}
+
+// QueryxContext runs a query with context and returns a set of rows
+func (p PGSQLConnection) QueryxContext(ctx context.Context, query string) (*sqlx.Rows, error) {
+	return p.connection.QueryxContext(ctx, query)
 }
 
 type extensions map[string]map[string]bool

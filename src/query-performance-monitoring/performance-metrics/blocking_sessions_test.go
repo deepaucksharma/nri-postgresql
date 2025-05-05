@@ -1,6 +1,7 @@
 package performancemetrics
 
 import (
+	"context"
 	"database/sql/driver"
 	"fmt"
 	"regexp"
@@ -23,6 +24,8 @@ func TestGetBlockingMetrics(t *testing.T) {
 	databaseName := "testdb"
 	version := uint64(13)
 	cp := common_parameters.SetCommonParameters(args, version, databaseName)
+	ctx := context.Background()
+	
 	expectedQuery := queries.BlockingQueriesForV12AndV13
 	query := fmt.Sprintf(expectedQuery, databaseName, args.QueryMonitoringCountThreshold)
 	rowData := []driver.Value{
@@ -36,8 +39,11 @@ func TestGetBlockingMetrics(t *testing.T) {
 		"newrelic", "blocked_pid", "blocked_query", "blocked_query_id", "blocked_query_start", "database_name",
 		"blocking_pid", "blocking_query", "blocking_query_id", "blocking_query_start",
 	}).AddRow(rowData...).AddRow(rowData...)
+	
+	// Use ExpectQuery instead of ExpectQueryContext since the older sqlmock doesn't have that method
 	mock.ExpectQuery(regexp.QuoteMeta(query)).WillReturnRows(mockRows)
-	blockingQueriesMetricsList, err := getBlockingMetrics(conn, cp)
+	
+	blockingQueriesMetricsList, err := getBlockingMetrics(ctx, conn, cp)
 	compareMockRowsWithMetrics(t, expectedRows, blockingQueriesMetricsList)
 	assert.NoError(t, err)
 	assert.Len(t, blockingQueriesMetricsList, 2)
@@ -68,7 +74,9 @@ func TestGetBlockingMetricsErr(t *testing.T) {
 	databaseName := "testdb"
 	version := uint64(13)
 	cp := common_parameters.SetCommonParameters(args, version, databaseName)
-	_, err := getBlockingMetrics(conn, cp)
+	ctx := context.Background()
+	
+	_, err := getBlockingMetrics(ctx, conn, cp)
 	assert.EqualError(t, err, commonutils.ErrUnExpectedError.Error())
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

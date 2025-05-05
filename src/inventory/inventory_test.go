@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"context"
 	"testing"
 
 	"github.com/newrelic/infra-integrations-sdk/v3/data/inventory"
@@ -16,14 +17,16 @@ func TestPopulateInventory(t *testing.T) {
 	testEntity, _ := testIntegration.Entity("test", "instance")
 
 	testConnection, mock := connection.CreateMockSQL(t)
+	ctx := context.Background()
 
 	configRows := sqlmock.NewRows([]string{"name", "setting", "boot_val", "reset_val"}).
 		AddRow("allow_system_table_mods", "off", "on", "test").
 		AddRow("authentication_timeout", 1, 2, 3)
 
+	// Use ExpectQuery instead of ExpectQueryContext since the older sqlmock doesn't have that method
 	mock.ExpectQuery(configQuery).WillReturnRows(configRows)
 
-	PopulateInventory(testEntity, testConnection)
+	PopulateInventory(ctx, testEntity, testConnection)
 
 	expected := inventory.Items{
 		"allow_system_table_mods/setting": {

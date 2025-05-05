@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -29,7 +30,6 @@ var (
 )
 
 func main() {
-
 	var args args.ArgumentList
 	// Create Integration
 	pgIntegration, err := integration.New(integrationName, integrationVersion, integration.Args(&args))
@@ -84,7 +84,9 @@ func main() {
 			log.Error("Inventory collection failed: error creating connection to PostgreSQL: %s", err.Error())
 		} else {
 			defer con.Close()
-			inventory.PopulateInventory(instance, con)
+			// Create a context for the inventory collection
+			ctx := context.Background()
+			inventory.PopulateInventory(ctx, instance, con)
 		}
 	}
 
@@ -95,5 +97,4 @@ func main() {
 	if args.EnableQueryMonitoring {
 		queryperformancemonitoring.QueryPerformanceMain(args, pgIntegration, collectionList)
 	}
-
 }
