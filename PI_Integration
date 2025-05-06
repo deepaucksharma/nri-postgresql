@@ -1,0 +1,592 @@
+# Final Enhanced AWS PI Implementation Backlog
+
+Below is the final enhanced backlog for implementing AWS Performance Insights integration into the New Relic PostgreSQL integration. This backlog builds directly on our recent context-aware refactoring work and incorporates the self-metrics pattern we've established.
+
+## 🌟 Epic 1 – AWS Performance Insights Data-Pipeline
+
+*Business outcome:* RDS/Redshift customers see PI-powered Postgres telemetry in New Relic within <5 minutes of enabling the feature, with complete context handling and instrumentation.
+
+### Story S1 – STS AssumeRole Support
+
+**Story Points:** 5
+
+**Context & Goal:** 
+Enable the PostgreSQL integration to authenticate with AWS Performance Insights API using IAM role-based authentication, fully integrating with our new context-aware architecture.
+
+**Enhanced Acceptance Criteria:**
+- GIVEN `--aws-role arn:aws:iam::123:role/nr-reader` parameter
+- WHEN integration starts
+- THEN `sts:AssumeRole` is called with correct session name "NewRelic-PGSQL-Integration"
+- AND temporary credentials are cached securely in memory
+- AND credentials are automatically refreshed 5 minutes before expiry
+- AND context is propagated to all AWS API calls using the same pattern as our refactored DB calls
+- AND all AWS API operations use the new store pattern with proper timeout handling
+
+**Engineering Tasks:**
+- **D**: Create sequence diagram showing credential flow and context propagation
+- **C**: Implement credential provider with context support using `aws-sdk-go-v2`
+- **C**: Add AWS config struct to `args.go` with validation
+- **C**: Create credential refresh mechanism with configurable threshold
+- **C**: Integrate with our existing context-aware architecture in store/postgres
+- **T**: Create comprehensive unit tests with AWS SDK mocks
+- **T**: Test error handling and token expiration scenarios 
+- **CR**: Have security team review the implementation
+
+**Definition of Done:**
+- ✅ Unit tests cover ≥90% of credential handling code
+- ✅ Debug log shows assumed role identity and expiry timeline
+- ✅ Credentials are never logged in plain text
+- ✅ All AWS API calls pass through context for proper cancellation
+- ✅ Same context pattern used in AWS calls as in our DB calls
+- ✅ Performance test shows < 100ms overhead for token refresh
+
+### Story S2 – Default Credential Provider Chain
+
+**SP:** 3
+
+**Context & Goal:**
+Create a fallback authentication chain for AWS that follows the same context-aware patterns as our PostgreSQL connection handling.
+
+**Acceptance Criteria:**
+1. GIVEN no `--aws-role` flag
+   WHEN integration starts in any of the following environments
+   THEN credentials are sourced via AWS-SDK default chain in **≤200 ms**:
+   * Env vars (`AWS_ACCESS_KEY_ID`, …)
+   * Shared config/credentials profile
+   * EC2/ECS/POD IMDSv2
+2. If all providers fail, integration exits with **clear error** `NRPG_AWS_NO_CREDS`
+3. All credential fetch and refresh paths propagate `context.Context` using the same pattern as our DB connections
+4. Uses timeouts and cancellation consistent with our store package implementation
+
+**Engineering Tasks:**
+* **D**: Create sequence diagram showing provider order & timeout flow
+* **C**: Implement composite provider with per-provider 50 ms soft timeout
+* **C**: Use context-aware methods throughout, following our store package patterns
+* **T**: Unit tests for 6 permutations of credential availability
+* **T**: Integration test with LocalStack to prove IMDS path
+* **DOC**: Update README "Authentication" matrix
+* **CR**: Code review focusing on context propagation patterns
+
+**DoD:**
+* ✅ 90% test coverage for provider chain
+* ✅ Failure message logged once, includes remediation hint
+* ✅ Context propagation verified in tests
+* ✅ Works on arm64 & amd64 runners
+
+### Story S3 – Paginated Fetcher
+
+**Story Points:** 5
+
+**Context & Goal:**
+Implement a robust fetcher for AWS PI metrics that leverages our new context-aware architecture, with proper timeout and cancellation handling.
+
+**Enhanced Acceptance Criteria:**
+- GIVEN PI API returns large datasets with pagination
+- WHEN integration queries for metrics over time ranges exceeding 5MB of data
+- THEN requests are automatically paginated using `NextPageToken`
+- AND memory usage remains under 100MB regardless of result size
+- AND context cancellation properly stops in-progress fetches (using our new context pattern)
+- AND each page fetch has appropriate timeout (30s default, configurable)
+- AND self-metrics increment according to the pattern established in our collectors
+- AND concurrent requests are limited to avoid API rate limiting
+
+**Engineering Tasks:**
+- **D**: Design paging iterator integrating with our store package pattern
+- **C**: Implement context-aware paginated fetcher with the same timeout pattern
+- **C**: Add metrics to the selfmetrics package for page fetches, bytes downloaded
+- **C**: Implement batched processing that processes each page before fetching next
+- **T**: Create unit tests with mocked AWS responses including pagination
+- **T**: Test context cancellation using the patterns from our DB tests
+
+**Definition of Done:**
+- ✅ Load test report shows stable memory usage under 100MB with 10k records
+- ✅ Context cancellation immediately stops fetching new pages
+- ✅ Self-metrics track pages fetched, bytes downloaded using our established pattern
+- ✅ Uses the same context propagation pattern as our DB operations
+- ✅ CPU usage remains below 1 vCPU during fetching and processing
+
+### Story S4 – Dimension Discovery
+
+**SP:** 3
+
+**Context & Goal:**
+Discover and cache PI dimension keys using our context-aware architecture for efficient operations.
+
+**Acceptance Criteria:**
+* Calls `DescribeDimensionKeys` **per DB instance** on start-up
+* Results cached for **15 minutes** (configurable); cache invalidates on SIGHUP
+* Uses the same context propagation pattern established in our DB operations
+* If cache expires mid-harvest, discovery is re-triggered **asynchronously** without blocking
+* Missing or unknown keys log **WARN** once
+* Context timeout of 10s, consistent with our other operations
+
+**Engineering Tasks:**
+* **D**: Cache state diagram showing how context influences behavior
+* **C**: Implementation with `sync.Map` for thread safety
+* **C**: Async refresh goroutine with proper context handling
+* **C**: Integration with selfmetrics package for cache hit monitoring
+* **T**: Unit tests for context cancellation, expiry, and SIGHUP reload
+* **DOC**: Add description of dimension keys and context behavior
+
+**DoD:**
+* ✅ Cache hit ratio metric `piDimensionCacheHits` emitted
+* ✅ Memory profile shows ≤2 MB per 100 instances
+* ✅ Context cancellation properly handled throughout
+
+### Story S5 – YAML Mapping File
+
+**SP:** 3
+
+**Context & Goal:**
+Implement declarative field mapping for PI metrics, using hot-reload capabilities.
+
+**Acceptance Criteria:**
+1. Mapping file path = `${CONF_DIR}/pi_mappings.yml` (override with `--pi-map`)
+2. Unknown PI fields are logged `WARN` once per session
+3. File watch reload on SIGHUP; invalid YAML aborts reload but not the process
+4. Reload should be context-aware, using the same patterns as our DB operations
+5. Hot reload proves in e2e test: change map → new events use new names without restart
+
+**Engineering Tasks:**
+* **D**: Mapping schema & examples
+* **C**: YAML loader with `mapstructure` v2 for tag decoding
+* **C**: Context-aware reloading mechanism following our established patterns
+* **C**: Integration into transform layer
+* **T**: Unit tests for happy path, invalid YAML, unknown fields, context cancellation
+* **DOC**: Document mapping format and hot reload behavior
+
+**DoD:**
+* ✅ Reload observed in logs
+* ✅ Unit tests ≥95% on mapper
+* ✅ File handle leak check passes (`lsof`)
+* ✅ Consistent context handling throughout
+
+### Story S6 – Query-ID Correlation
+
+**SP:** 5
+
+**Context & Goal:**
+Link PI's query hash with NR-side `query_id` to enable cross-source drill-down, consistently using our context-aware approach.
+
+**Acceptance Criteria:**
+* Hash algorithm: `SHA1(db+queryText+plan)` truncated to 64-bit
+* ≥98% match rate on synthetic fixture of 1,000 queries
+* Falls back to PI's `queryHash` if mismatch; mismatch logged `INFO` with sample IDs
+* Feature flag `--pi-id-match off|warn|strict` controls failure policy
+* All operations use context propagation with appropriate timeouts, following our refactored pattern
+
+**Engineering Tasks:**
+* **D**: Document hashing formula & collision odds analysis
+* **C**: Implementation in `commonutils/hash.go` with context support
+* **C**: Integration with selfmetrics for match rate tracking
+* **T**: Fixture generator; match-rate assertion
+* **T**: Context cancellation tests
+* **DOC**: Document the correlation method and context handling
+
+**DoD:**
+* ✅ Fixture match ≥98%
+* ✅ Strict mode unit test causes startup failure as expected
+* ✅ Context handling follows the same pattern as our DB operations
+
+### Story S7 – Merge Policy Flag
+
+**SP:** 3
+
+**Context & Goal:**
+Allow operators to configure how PI and pg_stat metrics merge, consistent with our architecture.
+
+**Acceptance Criteria:**
+* Flag `--pi-merge-policy append|override|prefer-newer`, default `append`
+* Documented precedence rules per policy
+* Merge operation respects context timeout/cancellation
+* Unit tests cover each policy with conflicting fields
+
+**Engineering Tasks:**
+* **C**: Context-aware merge engine function
+* **C**: Integration with selfmetrics for policy tracking
+* **T**: Policy matrix tests including context cancellation cases
+* **DOC**: Table of examples and context behavior
+
+**DoD:**
+* ✅ NR payload matches selected policy in integration test
+* ✅ Context cancellation properly handled
+
+### Story S8 – Batch Flush Logic
+
+**SP:** 3
+
+**Context & Goal:**
+Implement efficient batching for PI data ingest, using our context-aware approach.
+
+**Acceptance Criteria:**
+* Flush when `bufferLen >= N` **OR** `age ≥ 5s`
+* Shutdown flushes remaining records
+* Flush operations respect context cancellation
+* Bench: 10k records → GC allocations ≤1.2× baseline
+
+**Tasks:**
+* **C**: Ring-buffer implementation; channel-based timer
+* **C**: Context-aware flush mechanism
+* **C**: Integration with selfmetrics for flush monitoring
+* **T**: Concurrency test w/ race detector
+* **T**: Context cancellation tests
+* **OPS**: Add PromQL alert for `piFlushFailures`
+
+**DoD:**
+* ✅ Race-free build
+* ✅ Benchmarks committed
+* ✅ Context handling consistent with our DB operations
+
+### Story S9 – Exponential Back-off
+
+**SP:** 5
+
+**Context & Goal:**
+Handle AWS PI throttling gracefully, respecting context cancellation.
+
+**AC:**
+* Jittered back-off: base 200ms, factor 2, cap 30s
+* After 5m cumulative back-off, integration disables PI and sets self-metric `piDisabled=1`
+* Back-off respects context cancellation using our established pattern
+* Uses selfmetrics to track back-off events and durations
+
+**Tasks:**
+* **C**: Retry middleware in `pkg/awsutil/retry.go` with context support
+* **C**: Integration with selfmetrics for back-off monitoring
+* **T**: Chaos test injects 50% throttle → collector stays alive
+* **T**: Context cancellation tests
+* **DOC**: Document back-off behavior and context handling
+
+**DoD:**
+* ✅ Chaos test green
+* ✅ No tight retry loops in CPU profile
+* ✅ Context cancellation properly handled
+
+### Story S10 – Budget Forecast Check
+
+**SP:** 5
+
+**Context & Goal:**
+Prevent surprise AWS bills by implementing budget checks with proper context handling.
+
+**AC:**
+* Flag `--pi-budget 25USD`
+* Queries AWS Cost Explorer forecast for PI namespace daily at 00:00 UTC
+* If forecast > budget, disable PI fetch, emit event `PiBudgetBreach`
+* Re-checks automatically next day
+* All operations use context with appropriate timeouts, following our refactored pattern
+
+**Tasks:**
+* **D**: Cron scheduler design with context integration
+* **C**: CE client wrapper with context support
+* **C**: Integration with selfmetrics for budget tracking
+* **T**: Mock CE responses
+* **T**: Context cancellation tests
+* **DOC**: Budgeting guide with context behavior explanation
+
+**DoD:**
+* ✅ Integration test passes with LocalStack CE stub
+* ✅ NR event visible in demo account
+* ✅ Context handling follows our established pattern
+
+### Story S11 – Sampling Window Flag
+
+**SP:** 2
+
+**Context & Goal:**
+Let users trade cost vs. granularity with configurable sampling windows.
+
+**AC:**
+* `--pi-window <duration>` accepts 1–15m; default 5m
+* Invalid value exits with code `NRPG_BAD_FLAG`
+* Window length reflected in API `PeriodInSeconds`
+* Window configuration affects context timeouts appropriately
+
+**Tasks:**
+* **C**: Flag parsing & validation
+* **C**: Context timeout adjustment based on window
+* **T**: Unit tests including context behavior
+* **DOC**: Document window configuration and context impact
+
+**DoD:**
+* ✅ Functional tests verify API params
+* ✅ Context timeouts properly scale with window size
+
+### Story S12 – `--pi-dry-run` Mode
+
+**SP:** 1
+
+**Context & Goal:**
+Allow safe PoC without ingesting data to NR.
+
+**AC:**
+* When flag set, ingestion step is skipped; log line `PI-DRY-RUN true`
+* Self-metric `piDryRun=1` emitted
+* All context handling remains active during dry-run
+
+**Tasks:**
+* **C**: Dry-run flag implementation
+* **C**: Integration with selfmetrics
+* **T**: Unit tests including context verification
+* **DOC**: Document dry-run mode
+
+**DoD:**
+* ✅ Unit test asserts no NR client calls
+* ✅ Context handling remains consistent with production mode
+
+### Story S13 – Collector Metrics
+
+**Story Points:** 3
+
+**Context & Goal:**
+Implement comprehensive self-telemetry for AWS PI collection, building on our established selfmetrics framework.
+
+**Enhanced Acceptance Criteria:**
+- GIVEN the integration is configured to collect PI metrics
+- WHEN collection runs
+- THEN the following metrics are emitted every harvest cycle:
+  - `piApiCalls` (count, per endpoint)
+  - `piApiErrors` (count, with error type dimension)
+  - `piThrottles` (count)
+  - `piBytesDownloaded` (bytes)
+  - `piProcessingTime` (milliseconds)
+  - `piQueryCount` (count of unique queries collected)
+  - `piDBInstanceCount` (count of DB instances monitored)
+  - `piMemoryUsage` (bytes)
+  - `piCPUTime` (milliseconds)
+  - `piFetchLatency` (milliseconds, with min/max/avg dimensions)
+  - `piContextCancellations` (count, with reason dimension)
+
+**Engineering Tasks:**
+- **D**: Define metric schema with dimensions and aggregation methods
+- **C**: Extend our existing `selfmetrics` package to support new PI metrics
+- **C**: Implement context-tracking metrics (cancellations, timeouts)
+- **C**: Add proper tagging of metrics by DB instance and region
+- **C**: Integrate resource usage tracking (memory, CPU)
+- **T**: Create unit tests for all new metrics
+- **T**: Create integration test validating metrics appear in NR
+- **DOC**: Update metric documentation with new PI metrics
+
+**Definition of Done:**
+- ✅ All metrics appear in New Relic with correct dimensions
+- ✅ Metrics use appropriate units and aggregation methods
+- ✅ Overhead of metrics collection is < 5% of total CPU time
+- ✅ Documentation includes complete metrics list with examples
+- ✅ Context-related metrics properly track timeouts and cancellations
+
+### Story S14 – Alertable Dashboard
+
+**SP:** 3
+
+**Context & Goal:**
+Ship a one-click NR One dashboard that surfaces PI collector health, including context-aware metrics.
+
+**AC:**
+* Terraform JSON (NR NerdGraph) artifact committed under `/ops/terraform/dashboard_pi.json`
+* Widgets: API call counts, throttles, ingest latency, budget status, context cancellations
+* Alert policy: `piApiErrors >0 for 5m` (critical), `piThrottles >20/min` (warning), `piContextCancellations >10/min` (warning)
+* Example screenshot added to docs
+
+**Tasks:**
+* **D**: Design dashboard layout including context-related metrics
+* **OPS**: Terraform module + README
+* **DOC**: Document dashboard and alert configuration
+
+**DoD:**
+* ✅ Module applies cleanly in staging account
+* ✅ Alerts fire & auto-close in demo
+* ✅ Context metrics properly visualized
+
+### Story S15 – Least-Privilege IAM Policy
+
+**SP:** 1
+
+**Context & Goal:**
+Ship a battle-tested, copy-paste policy for AWS PI access.
+
+**AC:**
+* Policy limits to `pi:Get*`, `ce:GetCost*`, `kms:Decrypt` (if secret ARN supplied)
+* Passes AWS IAM Access Analyzer: **no public or wildcard resources**
+* Uploaded to internal SecOps Confluence; Jira SEC-123 approved
+
+**Tasks:**
+* **D**: IAM policy design
+* **DOC**: Policy documentation with usage examples
+* **CR**: Security team review
+
+**DoD:**
+* ✅ Policy JSON in `/docs/iam/pi_policy.json`
+* ✅ SEC-123 approval recorded
+
+### Story S16 – KMS-Encrypted Secrets
+
+**SP:** 3
+
+**Context & Goal:**
+Let customers store NR ingest license key in AWS Secrets Manager with KMS encryption.
+
+**AC:**
+* Flag `--nr-secret-arn arn:aws:secretsmanager:…`
+* Integration calls `kms:Decrypt` via Secrets Manager SDK
+* Secret operations use context with appropriate timeouts
+* Plaintext never written to disk or logs
+* Failure to decrypt aborts startup
+
+**Tasks:**
+* **C**: Context-aware secret fetcher with retries
+* **C**: Integration with our context architecture
+* **T**: Unit & integration tests with LocalStack
+* **T**: Context cancellation tests
+* **SEC**: Review threat model
+
+**DoD:**
+* ✅ Snyk & Trivy scans clean
+* ✅ Context handling consistent with our DB operations
+* ✅ Pen-test checklist ticked
+
+### Story S17 – User Guide
+
+**SP:** 2
+
+**Context & Goal:**
+Create comprehensive documentation for AWS PI integration.
+
+**AC:**
+* Includes: enable PI in console/CLI, cost estimate table, flags reference, dashboard screenshot, IAM policy snippet
+* Documents context-aware behavior and timeout configuration
+* Lives in `docs/aws-pi-user-guide.md`
+
+**Tasks:**
+* **DOC**: Write documentation
+* **DOC**: Include context handling explanation
+* **DOC**: Add troubleshooting section for context-related issues
+
+**DoD:**
+* ✅ Tech writer review
+* ✅ Read-time <10 min (Hemingway ≤10)
+
+### Story S18 – Migration Guide
+
+**SP:** 2
+
+**Context & Goal:**
+Document migration path to AWS PI integration.
+
+**AC:**
+* Covers upgrade path from vX.Y to vX.Z, hybrid pg_stat+PI, rollback steps
+* Explains context architecture benefits
+* FAQ section with common errors & fixes
+
+**Tasks:**
+* **DOC**: Write migration documentation
+* **DOC**: Include context architecture explanation
+* **DOC**: Add troubleshooting for context-related issues
+
+**DoD:**
+* ✅ Paired review with Support team
+* ✅ Context architecture benefits highlighted
+
+### Story S19 – Unit & Load Tests
+
+**SP:** 3
+
+**Context & Goal:**
+Implement comprehensive test suite for AWS PI integration.
+
+**AC:**
+* Coverage ≥90% on PI modules
+* Context-related code coverage ≥95%
+* Load test (10k rows) proves: RAM ≤100MB, CPU ≤1 vCPU
+* Executed in GitHub Actions nightly
+
+**Tasks:**
+* **T**: Go test & Go testbench script
+* **T**: Context cancellation tests
+* **OPS**: GitHub workflow YAML
+
+**DoD:**
+* ✅ Coverage badge in README
+* ✅ Context handling thoroughly tested
+
+### Story S20 – Rate-Limit Chaos Test
+
+**SP:** 2
+
+**Context & Goal:**
+Test system resilience under AWS throttling conditions.
+
+**AC:**
+* Chaos script injects 429 responses 10% random for 1h → system maintains service
+* Test includes context timeout injection
+* Test runs weekly via GH Action with AWS fault-injection lambda
+
+**Tasks:**
+* **T**: Chaos test implementation
+* **T**: Context timeout injection
+* **OPS**: GH Action setup
+
+**DoD:**
+* ✅ Runbook entry "PI Throttle Recovery" created
+* ✅ Chaos report artifact archived
+* ✅ Context handling robust under chaotic conditions
+
+### Story S21 – Context-Aware PI Collection Architecture
+
+**Story Points:** 5
+
+**Context & Goal:**
+Ensure AWS PI data collection fully integrates with our newly implemented context-aware architecture.
+
+**Acceptance Criteria:**
+- GIVEN the refactored context-aware PostgreSQL integration
+- WHEN AWS PI collection is added
+- THEN all PI API calls use context propagation for proper timeout/cancellation
+- AND collection gracefully handles context cancellation at any stage
+- AND all operations use our store package pattern with appropriate timeouts
+- AND resource cleanup happens properly during cancellation
+- AND all collectors follow the same context patterns established in our refactoring
+
+**Engineering Tasks:**
+- **D**: Create architecture diagram showing context flow through PI collection
+- **C**: Implement context-aware PI collector using our store pattern
+- **C**: Add appropriate timeouts for each PI API operation
+- **C**: Ensure consistent context handling across all components
+- **C**: Implement graceful cancellation and cleanup
+- **T**: Test timeout and cancellation scenarios
+- **T**: Create integration tests for end-to-end context handling
+
+**Definition of Done:**
+- ✅ All PI collection operations respect timeouts and cancellation
+- ✅ Resources are properly cleaned up on cancellation
+- ✅ Metrics track context cancellations and timeouts
+- ✅ Performance tests show minimal overhead from context handling
+- ✅ Integration with our existing context architecture is seamless
+
+## Cross-cutting Definition-of-Done
+
+In addition to story-specific DoD items, all stories must satisfy:
+
+1. Code reviewed & approved (≥2 reviewers, SecOps if touching auth)
+2. Unit tests pass; coverage Δ ≥ 0
+3. Context propagation verified throughout the component
+4. Integration tests green on GitHub Actions matrix (linux/amd64 & arm64)
+5. New metrics documented in `metrics.md`; flags in `README.md`
+6. CHANGELOG updated; semantic version bumped if public surface changed
+7. No TODO/FIXME left in diff; linter (`golangci-lint`) passes
+8. Context handling consistent with our store package pattern
+
+## Implementation Approach
+
+Given our recent refactoring work to make the PostgreSQL integration fully context-aware, we're in an excellent position to implement AWS PI functionality:
+
+1. **Leverage the store package pattern**: Use the approach we established in `store/postgres/store.go` for all AWS-related operations, with consistent timeout handling and context propagation.
+
+2. **Self-metrics integration**: Extend our self-metrics framework to track AWS PI operations, with the same counter incrementation pattern we've established.
+
+3. **Consistent context handling**: Propagate context throughout all operations, using the same patterns established in our DB operations.
+
+4. **Resource management**: Ensure proper cleanup on context cancellation, following the patterns we established during refactoring.
+
+5. **Test coverage**: Focus on thorough testing of context handling, especially cancellation and timeout scenarios.
+
+This approach ensures the AWS PI implementation will be fully integrated with our context-aware architecture and maintain the same high standards of reliability and maintainability.
